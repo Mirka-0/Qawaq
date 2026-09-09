@@ -1,6 +1,0 @@
-{
-  "name": "QAWAQ AI // SSOMA",
-  "description": "Supervisor virtual de seguridad para obras de construcción con detección de riesgos por IA y gestión SSOMA en tiempo real.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
