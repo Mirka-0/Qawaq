@@ -1,0 +1,86 @@
+import React from 'react';
+
+interface QawaqLogoProps {
+  className?: string;
+  size?: number;
+}
+
+export const QawaqLogo: React.FC<QawaqLogoProps> = ({
+  className = 'w-9 h-9',
+  size = 40,
+}) => {
+  return (
+    <svg
+      viewBox="0 0 512 512"
+      width={size}
+      height={size}
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Logo Qawaq"
+    >
+      <defs>
+        <linearGradient id="qawaq-bg-comp" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#151d2e" />
+          <stop offset="50%" stopColor="#0d1424" />
+          <stop offset="100%" stopColor="#080c16" />
+        </linearGradient>
+
+        <linearGradient id="qawaq-orange-comp" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ffa71a" />
+          <stop offset="50%" stopColor="#f59e0b" />
+          <stop offset="100%" stopColor="#ea580c" />
+        </linearGradient>
+
+        <linearGradient id="qawaq-tail-comp" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fb923c" />
+          <stop offset="100%" stopColor="#ea580c" />
+        </linearGradient>
+
+        <linearGradient id="qawaq-iris-comp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffb940" />
+          <stop offset="50%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#c2410c" />
+        </linearGradient>
+
+        <linearGradient id="qawaq-slate-ring-comp" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3d4f6c" />
+          <stop offset="100%" stopColor="#2c3a50" />
+        </linearGradient>
+      </defs>
+
+      {/* Dark navy squircle background with NO outer border */}
+      <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#qawaq-bg-comp)" />
+
+      {/* Center Crosshair / Aim Reticle Guides */}
+      <g stroke="#3a4b66" strokeWidth="3.5" opacity="0.85">
+        <line x1="256" y1="108" x2="256" y2="404" strokeDasharray="6 7" />
+        <line x1="120" y1="256" x2="162" y2="256" strokeDasharray="5 5" />
+        <line x1="350" y1="256" x2="392" y2="256" strokeDasharray="5 5" />
+      </g>
+
+      {/* Outer Slate Circle */}
+      <circle cx="256" cy="256" r="142" stroke="url(#qawaq-slate-ring-comp)" strokeWidth="36" fill="none" />
+
+      {/* Top Vibrant Orange Radar Arc */}
+      <path d="M 152 166 A 142 142 0 0 1 356 156" fill="none" stroke="url(#qawaq-orange-comp)" strokeWidth="38" strokeLinecap="round" />
+
+      {/* Radar Ping Green Node at right end of orange arc */}
+      <circle cx="360" cy="148" r="13" fill="#10b981" />
+      <circle cx="360" cy="148" r="21" stroke="#10b981" strokeWidth="3" fill="none" opacity="0.85" />
+
+      {/* Orange Rectangular Q-Tail (NO glow) */}
+      <rect x="306" y="306" width="42" height="106" rx="12" transform="rotate(-45 306 306)" fill="url(#qawaq-tail-comp)" />
+
+      {/* Center Eye Shape */}
+      <path d="M 166 256 C 196 198 316 198 346 256 C 316 314 196 314 166 256 Z" fill="#080c14" stroke="#1e293b" strokeWidth="4" strokeLinejoin="round" />
+
+      {/* Center Iris & Pupil */}
+      <circle cx="256" cy="256" r="35" fill="url(#qawaq-iris-comp)" />
+      <circle cx="256" cy="256" r="17" fill="#0a0e18" />
+      <circle cx="266" cy="246" r="8.5" fill="#ffffff" />
+      <circle cx="249" cy="264" r="3" fill="#fed7aa" opacity="0.75" />
+    </svg>
+  );
+};

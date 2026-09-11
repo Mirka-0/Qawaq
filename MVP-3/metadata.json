@@ -1,0 +1,6 @@
+{
+  "name": "Qawaq",
+  "description": "Supervisor virtual de seguridad para obras de construcción con detección de riesgos en tiempo real, geolocalización GPS y modo ahorro de batería.",
+  "requestFramePermissions": ["microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
