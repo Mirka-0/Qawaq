@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Qawaq",
+  "short_name": "Qawaq",
+  "description": "Supervisor virtual de seguridad para obras de construcción con detección de riesgos en tiempo real, geolocalización GPS y modo ahorro de batería.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0c1322",
+  "background_color": "#0A0A0A",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

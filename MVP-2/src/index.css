@@ -1,0 +1,230 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Chivo", sans-serif;
+  --font-body: "Work Sans", sans-serif;
+  --font-label: "Barlow Condensed", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-surface: #0b1326;
+  --color-surface-dim: #0b1326;
+  --color-surface-bright: #31394d;
+  --color-surface-container-lowest: #060e20;
+  --color-surface-container-low: #131b2e;
+  --color-surface-container: #171f33;
+  --color-surface-container-high: #222a3d;
+  --color-surface-container-highest: #2d3449;
+  --color-on-surface: #dae2fd;
+  --color-on-surface-variant: #d8c3ad;
+  --color-inverse-surface: #dae2fd;
+  --color-inverse-on-surface: #283044;
+  --color-outline: #a08e7a;
+  --color-outline-variant: #534434;
+  --color-surface-tint: #ffb95f;
+  --color-primary: #ffc174;
+  --color-on-primary: #472a00;
+  --color-primary-container: #f59e0b;
+  --color-on-primary-container: #613b00;
+  --color-inverse-primary: #855300;
+  --color-secondary: #ffb3ad;
+  --color-on-secondary: #68000a;
+  --color-secondary-container: #a40217;
+  --color-on-secondary-container: #ffaea8;
+  --color-tertiary: #56e5a9;
+  --color-on-tertiary: #003824;
+  --color-tertiary-container: #30c88f;
+  --color-on-tertiary-container: #004e34;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+  --color-primary-fixed: #ffddb8;
+  --color-primary-fixed-dim: #ffb95f;
+  --color-on-primary-fixed: #2a1700;
+  --color-on-primary-fixed-variant: #653e00;
+  --color-secondary-fixed: #ffdad7;
+  --color-secondary-fixed-dim: #ffb3ad;
+  --color-on-secondary-fixed: #410004;
+  --color-on-secondary-fixed-variant: #930013;
+  --color-tertiary-fixed: #6ffbbe;
+  --color-tertiary-fixed-dim: #4edea3;
+  --color-on-tertiary-fixed: #002113;
+  --color-on-tertiary-fixed-variant: #005236;
+  --color-background: #0b1326;
+  --color-on-background: #dae2fd;
+  --color-surface-variant: #2d3449;
+}
+
+body {
+  font-family: "Work Sans", sans-serif;
+  background-color: #0b1326;
+  color: #dae2fd;
+}
+
+h1, h2, h3, h4, h5, h6, .font-headline {
+  font-family: "Chivo", sans-serif;
+}
+
+.font-body {
+  font-family: "Work Sans", sans-serif;
+}
+
+.font-label {
+  font-family: "Barlow Condensed", sans-serif;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b1326;
+}
+::-webkit-scrollbar-thumb {
+  background: #222a3d;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Tactical scanline grid overlay effect */
+.tactical-grid {
+  background-image: radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ==========================================================================
+   LIGHT HIGH CONTRAST MODE (MODO ALTO CONTRASTE CLARO)
+   - Fondo general de la aplicación: blanco puro (#FFFFFF)
+   - Tarjetas, paneles y contenedores: blanco (#FFFFFF) o gris muy claro (#F8F9FA)
+   - Texto principal: negro puro (#000000)
+   ========================================================================== */
+
+html.light-mode,
+body.light-mode,
+#root.light-mode {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+.light-mode {
+  /* Application background: Pure White */
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+
+  /* Header & Navigation */
+  header,
+  nav {
+    background-color: #FFFFFF !important;
+    border-color: #E2E8F0 !important;
+  }
+
+  /* All dark surfaces map to Pure White or Very Light Gray (#F8F9FA) */
+  .bg-\[\#070d18\],
+  .bg-\[\#060e20\],
+  .bg-\[\#090e1a\],
+  .bg-\[\#0b1326\],
+  .bg-\[\#0c1322\] {
+    background-color: #FFFFFF !important;
+  }
+
+  .bg-\[\#111827\],
+  .bg-\[\#131b2e\],
+  .bg-\[\#171f33\],
+  .bg-\[\#1e293b\],
+  .bg-\[\#1a2337\],
+  .bg-\[\#222a3d\] {
+    background-color: #F8F9FA !important;
+  }
+
+  .bg-\[\#15120a\],
+  .bg-\[\#1e1b10\] {
+    background-color: #FFFBEB !important;
+  }
+
+  /* Crisp Borders */
+  .border-\[\#222a3d\],
+  .border-\[\#1e293b\],
+  .border-\[\#334155\],
+  .border-\[\#1a2337\] {
+    border-color: #E2E8F0 !important;
+  }
+
+  /* Main Headings & Primary Text: Pure Black (#000000) */
+  h1, h2, h3, h4, h5, h6,
+  .text-white,
+  .text-\[\#dae2fd\],
+  .text-\[\#e2e8f0\],
+  .text-\[\#cbd5e1\],
+  strong,
+  b {
+    color: #000000 !important;
+  }
+
+  /* Secondary & Muted Text: High-Contrast Dark Slate */
+  .text-\[\#94a3b8\],
+  .text-\[\#64748b\],
+  .text-slate-400,
+  .text-gray-400 {
+    color: #334155 !important;
+  }
+
+  /* Amber & High-Risk Brand Highlights with high readability on white */
+  .text-\[\#f59e0b\],
+  .text-\[\#ffc174\],
+  .text-\[\#ffb95f\],
+  .text-amber-400 {
+    color: #B45309 !important;
+  }
+
+  .text-emerald-400,
+  .text-emerald-300 {
+    color: #047857 !important;
+  }
+
+  .text-sky-400,
+  .text-sky-300 {
+    color: #0369A1 !important;
+  }
+
+  .text-rose-400,
+  .text-red-400 {
+    color: #B91C1C !important;
+  }
+
+  /* Form Inputs, Selects, and Textareas */
+  select, input, textarea {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border-color: #CBD5E1 !important;
+  }
+
+  select option {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  /* Modals & Dialog Overlays */
+  .bg-black\/80,
+  .bg-black\/85,
+  .bg-black\/90 {
+    background-color: rgba(15, 23, 42, 0.65) !important;
+  }
+
+  /* Scrollbars in Light Mode */
+  ::-webkit-scrollbar-track {
+    background: #FFFFFF;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+  }
+}
