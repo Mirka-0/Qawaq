@@ -37,12 +37,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.classList.add('light-mode');
       body.classList.add('light-mode');
       root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
     } else {
       root.classList.remove('light-mode');
       body.classList.remove('light-mode');
       root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
     }
   }, [theme]);
 

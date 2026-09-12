@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+// Declaration for browser SpeechRecognition API
 interface IWindow extends Window {
   SpeechRecognition?: any;
   webkitSpeechRecognition?: any;
@@ -38,6 +39,7 @@ export const useSpeechRecognition = (
   const optionsRef = useRef(defaultOptions);
   optionsRef.current = defaultOptions;
 
+  // Track if we manually stopped to avoid unwanted restart loops
   const isManuallyStoppedRef = useRef<boolean>(true);
 
   useEffect(() => {
@@ -79,11 +81,16 @@ export const useSpeechRecognition = (
       const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
 
       if (!SpeechRecognitionClass) {
-        setError('Tu navegador no soporta SpeechRecognition nativo.');
-        optionsRef.current.onError?.('SpeechRecognition no soportado.');
+        setError(
+          'Tu navegador no soporta SpeechRecognition nativo. Se recomienda Google Chrome, Edge o Safari.'
+        );
+        optionsRef.current.onError?.(
+          'SpeechRecognition no soportado en este navegador.'
+        );
         return;
       }
 
+      // Cleanup any previous instance
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -139,10 +146,17 @@ export const useSpeechRecognition = (
         };
 
         recognition.onerror = (event: any) => {
-          if (event.error === 'no-speech') return;
+          console.warn('SpeechRecognition error:', event.error);
           let userMsg = 'Error en reconocimiento de voz.';
           if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-            userMsg = 'Permiso de micrófono denegado.';
+            userMsg = 'Permiso de micrófono denegado. Habilita el acceso en tu navegador.';
+          } else if (event.error === 'no-speech') {
+            // Silence detected, not a fatal failure
+            return;
+          } else if (event.error === 'audio-capture') {
+            userMsg = 'No se detectó hardware de micrófono en el dispositivo.';
+          } else if (event.error === 'network') {
+            userMsg = 'Error de conexión con el servicio de transcripción.';
           }
           setError(userMsg);
           optionsRef.current.onError?.(userMsg);
@@ -150,10 +164,12 @@ export const useSpeechRecognition = (
 
         recognition.onend = () => {
           setInterimTranscript('');
+          // If not manually stopped and continuous was expected, we can restart or finish
           if (isManuallyStoppedRef.current) {
             setIsListening(false);
             optionsRef.current.onEnd?.();
           } else {
+            // Auto restart for prolonged dictation in noisy construction sites if desired
             try {
               recognition.start();
             } catch {
@@ -178,6 +194,7 @@ export const useSpeechRecognition = (
     setInterimTranscript('');
   }, []);
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       isManuallyStoppedRef.current = true;

@@ -7,12 +7,13 @@ export interface NotificationPreferences {
   soundEnabled: boolean;
 }
 
-const STORAGE_PREFS_KEY = 'qawaq_notification_prefs_v2';
+const STORAGE_PREFS_KEY = 'qawaq_notification_prefs_v1';
 
 export class NotificationService {
   private static swRegistration: ServiceWorkerRegistration | null = null;
   private static audioCtx: AudioContext | null = null;
 
+  // Initialize service worker & restore preferences
   public static async init(): Promise<void> {
     if (typeof window === 'undefined') return;
 
@@ -22,6 +23,7 @@ export class NotificationService {
           scope: '/',
         });
         this.swRegistration = registration;
+        console.log('[QAWAQ-SW] Service Worker registrado exitosamente con scope:', registration.scope);
       } catch (err) {
         console.warn('[QAWAQ-SW] Error registrando Service Worker:', err);
       }
@@ -76,14 +78,13 @@ export class NotificationService {
     }
   }
 
+  // Safety audible alert tone using Web Audio API
   public static playSafetyTone(type: 'alarm' | 'chime' | 'resolve' = 'alarm'): void {
     const prefs = this.getPreferences();
     if (!prefs.soundEnabled) return;
 
     try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextClass) return;
 
       if (!this.audioCtx) {
@@ -102,6 +103,7 @@ export class NotificationService {
       gain.connect(this.audioCtx.destination);
 
       if (type === 'alarm') {
+        // High attention 2-tone alarm: 880Hz -> 659Hz
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(880, now);
         osc.frequency.setValueAtTime(659, now + 0.12);
@@ -111,6 +113,7 @@ export class NotificationService {
         osc.start(now);
         osc.stop(now + 0.4);
       } else if (type === 'resolve') {
+        // Pleasant ascending major chord: 523Hz -> 659Hz -> 783Hz
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, now);
         osc.frequency.setValueAtTime(659.25, now + 0.1);
@@ -120,6 +123,7 @@ export class NotificationService {
         osc.start(now);
         osc.stop(now + 0.45);
       } else {
+        // Simple subtle chime
         osc.type = 'sine';
         osc.frequency.setValueAtTime(750, now);
         gain.gain.setValueAtTime(0.2, now);
@@ -128,10 +132,11 @@ export class NotificationService {
         osc.stop(now + 0.25);
       }
     } catch {
-      // Audio autoplay restrictions
+      // Audio autoplay policy might restrict until user interaction
     }
   }
 
+  // Core notification dispatcher
   public static async dispatchNotification(options: {
     title: string;
     body: string;
@@ -144,6 +149,7 @@ export class NotificationService {
     const prefs = this.getPreferences();
     if (!prefs.enabled) return false;
 
+    // Play audible tone
     if (options.soundType) {
       this.playSafetyTone(options.soundType);
     }
@@ -162,9 +168,12 @@ export class NotificationService {
       data: options.data || {},
       vibrate: options.vibratePattern || [300, 100, 300, 100, 300],
       requireInteraction: true,
-      actions: options.actions || [{ action: 'view', title: 'Ver en App' }],
+      actions: options.actions || [
+        { action: 'view', title: 'Ver en App' }
+      ],
     };
 
+    // 1. Try displaying via Service Worker registration (best for background/foreground)
     if ('serviceWorker' in navigator) {
       try {
         const registration = this.swRegistration || (await navigator.serviceWorker.ready);
@@ -177,6 +186,7 @@ export class NotificationService {
       }
     }
 
+    // 2. Fallback to standard window Notification constructor if SW isn't active
     if ('Notification' in window) {
       try {
         new Notification(payload.title, {
@@ -194,14 +204,15 @@ export class NotificationService {
     return false;
   }
 
+  // Notify for New AI Alert
   public static async notifyNewAiAlert(caseItem: CaseItem): Promise<boolean> {
     const prefs = this.getPreferences();
     if (!prefs.aiAlerts) return false;
 
-    const isCritical = caseItem.prioridad === 'Crítico' || caseItem.urgencia === 'Alto';
+    const isCritical = caseItem.urgencia === 'Alto';
     return this.dispatchNotification({
       title: `🚨 [ALERTA IA] ${caseItem.tipo.toUpperCase()}`,
-      body: `Caso #${caseItem.id} detectado en ${caseItem.ubicacion}. Prioridad: ${caseItem.prioridad}. Responsable: ${caseItem.responsable}`,
+      body: `Caso #${caseItem.id} detectado en ${caseItem.ubicacion}. Urgencia: ${caseItem.urgencia}. Responsable: ${caseItem.responsable}`,
       tag: `ai-alert-${caseItem.id}`,
       data: {
         caseId: caseItem.id,
@@ -217,6 +228,7 @@ export class NotificationService {
     });
   }
 
+  // Notify for Case Status Update
   public static async notifyCaseStatusUpdate(
     caseItem: CaseItem,
     newStatus: CaseStatus,
@@ -239,11 +251,15 @@ export class NotificationService {
       },
       vibratePattern: isClosed ? [150, 80, 150] : [200, 100, 200],
       soundType: isClosed ? 'resolve' : 'chime',
-      actions: [{ action: 'view', title: 'Ver en Dashboard' }],
+      actions: [
+        { action: 'view', title: 'Ver en Dashboard' },
+      ],
     });
   }
 
+  // Test background delivery with a countdown
   public static async scheduleBackgroundTest(delaySeconds: number = 5): Promise<void> {
+    // If SW is available, post message to SW to fire in X seconds
     const registration = this.swRegistration || (await navigator.serviceWorker.ready);
     const payload = {
       title: '⚡ [DEMO BACKGROUND] QAWAQ Alerta de Prueba',
@@ -259,6 +275,7 @@ export class NotificationService {
         payload,
       });
     } else {
+      // Fallback
       setTimeout(() => {
         this.dispatchNotification({
           title: payload.title,

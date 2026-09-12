@@ -14,7 +14,6 @@ import {
   FileCheck,
   Send,
   Navigation,
-  FileText,
 } from 'lucide-react';
 import { CaseItem, PriorityLevel } from '../types';
 import { formatSlaCountdown, useLiveTimer } from '../utils/sla';
@@ -38,8 +37,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   onExportPdf,
 }) => {
   const { assignCase, approveValidation, rejectValidation, startCorrection } = useCases();
-  const { currentRole, isSSOMA, isSupervisor, isGerencia } = useRole();
-  const now = useLiveTimer(3000);
+  const { currentRole, isSSOMA, isSupervisor } = useRole();
+  const now = useLiveTimer(5000);
 
   // Rejection modal state
   const [isRejecting, setIsRejecting] = useState(false);
@@ -47,10 +46,10 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
 
   // Approval dictamen
   const [dictamen, setDictamen] = useState(
-    'Evidencia técnica conforme a normativa G.050 y D.S. 011-2019-TR. Subsanación validada en campo.'
+    'Evidencia técnica conforme a normativa G.050. Subsanación validada en campo.'
   );
 
-  // Direct assignment state if case is Abierto
+  // SSOMA direct assignment state if case is Abierto
   const [selectedSupervisorId, setSelectedSupervisorId] = useState(SUPERVISOR_LIST[0].id);
   const [selectedPriority, setSelectedPriority] = useState<PriorityLevel>('Alto');
 
@@ -124,15 +123,15 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
 
             <div>
-              <div className="text-[10px] font-mono uppercase text-[#64748b]">Prioridad</div>
+              <div className="text-[10px] font-mono uppercase text-[#64748b]">Prioridad / SLA</div>
               <div className="font-['Chivo'] font-bold text-xs sm:text-sm text-[#f59e0b] mt-0.5">
                 {caseItem.prioridad}
               </div>
             </div>
 
             <div>
-              <div className="text-[10px] font-mono uppercase text-[#64748b]">SLA / Tiempo Restante</div>
-              <div className={`font-mono text-xs font-bold mt-0.5 ${sla.isVencido ? 'text-red-400 font-black' : 'text-[#38bdf8]'}`}>
+              <div className="text-[10px] font-mono uppercase text-[#64748b]">Plazo Objetivo</div>
+              <div className={`font-mono text-xs font-bold mt-0.5 ${sla.isVencido ? 'text-red-400' : 'text-[#38bdf8]'}`}>
                 {sla.text}
               </div>
             </div>
@@ -153,7 +152,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                 <span>
                   Coordenadas GPS de Campo:{' '}
                   <strong className="text-[#dae2fd]">
-                    {caseItem.coordenadas.lat.toFixed(6)}, {caseItem.coordenadas.lng.toFixed(6)}
+                    {caseItem.coordenadas.latitud.toFixed(6)}, {caseItem.coordenadas.longitud.toFixed(6)}
                   </strong>
                 </span>
               </div>
@@ -209,7 +208,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                         alt="Evidencia Técnica"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute bottom-1 left-1 bg-black/80 px-2 py-0.5 rounded font-mono text-[9px] text-emerald-400 font-bold">
+                      <div className="absolute bottom-1 left-1 bg-black/80 px-2 py-0.5 rounded font-mono text-[9px] text-emerald-400">
                         {caseItem.estado === 'Cerrado' ? 'Certificado Conforme' : 'Evidencia Enviada'}
                       </div>
                     </>
@@ -260,8 +259,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           )}
 
-          {/* Action Module: Assignment for SSOMA if case is Abierto (hidden for Gerencia) */}
-          {isSSOMA && !isGerencia && isAbierto && (
+          {/* Action Module: Assignment for SSOMA if case is Abierto */}
+          {isSSOMA && isAbierto && (
             <div className="bg-[#131b2e] p-4 rounded-xl border border-[#f59e0b]/40">
               <h4 className="font-['Chivo'] font-bold text-sm text-[#f59e0b] uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <HardHat className="w-4 h-4" /> Asignar Responsable en Obra
@@ -314,8 +313,8 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
             </div>
           )}
 
-          {/* Action Module: Validation Controls for SSOMA if Pendiente de Validación (hidden for Gerencia) */}
-          {isSSOMA && !isGerencia && isPendingValidation && (
+          {/* Action Module: Validation Controls for SSOMA if Pendiente de Validación */}
+          {isSSOMA && isPendingValidation && (
             <div className="bg-[#15120a] p-4 rounded-xl border border-amber-500/40 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-['Chivo'] font-bold text-sm text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
@@ -366,14 +365,14 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               ) : (
                 <form onSubmit={handleConfirmReject} className="space-y-3 bg-[#1e0d14] p-3 rounded-xl border border-red-500/40">
                   <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-red-300 uppercase">
-                    <AlertCircle className="w-4 h-4" /> Motivo del Rechazo (Obligatorio para que campo corrija):
+                    <AlertCircle className="w-4 h-4" /> Motivo del Rechazo (Obligatorio para campo):
                   </div>
                   <textarea
                     rows={2}
                     required
                     value={rejectComment}
                     onChange={(e) => setRejectComment(e.target.value)}
-                    placeholder="Indica qué falta o por qué la subsanación no cumple la normativa técnica..."
+                    placeholder="Indica qué falta o por qué la subsanación no cumple las normas de seguridad..."
                     className="w-full bg-[#070d18] border border-red-500/40 focus:border-red-400 rounded-xl p-2.5 text-xs text-[#dae2fd] placeholder:text-[#64748b] focus:outline-none"
                   />
                   <div className="flex justify-end gap-2">
@@ -400,7 +399,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           {/* Audit History Timeline */}
           <div>
             <h4 className="text-xs font-mono uppercase text-[#64748b] font-bold mb-3 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#f59e0b]" /> Historial de Trazabilidad & Auditoría
+              <Clock className="w-3.5 h-3.5" /> Historial de Trazabilidad & Auditoría
             </h4>
 
             <div className="relative pl-6 border-l-2 border-[#1e293b] space-y-4">
@@ -417,6 +416,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
                   ]
               ).map((entry, idx) => (
                 <div key={idx} className="relative group">
+                  {/* Timeline dot */}
                   <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-[#0c1322] border-2 border-[#f59e0b] group-hover:scale-125 transition-transform" />
 
                   <div className="bg-[#070d18] p-3 rounded-xl border border-[#1e293b]">
@@ -464,25 +464,13 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
           <div className="text-[10px] font-mono text-[#64748b]">
             Qawaq Auditoría · Protocolo DS 011-2019-TR
           </div>
-          <div className="flex items-center gap-2">
-            {onExportPdf && (
-              <button
-                type="button"
-                onClick={() => onExportPdf(caseItem)}
-                className="px-3.5 py-2 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#f59e0b] border border-[#f59e0b]/30 font-['Chivo'] font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Exportar PDF</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#dae2fd] font-['Chivo'] font-bold text-xs uppercase tracking-wider transition-all"
-            >
-              Cerrar Ventana
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#dae2fd] font-['Chivo'] font-bold text-xs uppercase tracking-wider transition-all"
+          >
+            Cerrar Ventana
+          </button>
         </div>
       </div>
     </div>

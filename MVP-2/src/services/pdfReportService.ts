@@ -1,6 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { CaseItem } from '../types';
 
+/**
+ * Loads an image from URL and converts to base64 Data URL for jsPDF embedding
+ */
 async function getBase64ImageFromUrl(imageUrl: string): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -21,7 +24,7 @@ async function getBase64ImageFromUrl(imageUrl: string): Promise<string | null> {
         const dataURL = canvas.toDataURL('image/jpeg', 0.85);
         resolve(dataURL);
       } catch (err) {
-        console.warn('Could not export image to data URL:', err);
+        console.warn('Could not export image to data URL due to CORS:', err);
         resolve(null);
       }
     };
@@ -30,29 +33,14 @@ async function getBase64ImageFromUrl(imageUrl: string): Promise<string | null> {
       resolve(null);
     };
 
-    setTimeout(() => resolve(null), 2500);
+    // Timeout fallback after 3 seconds
+    setTimeout(() => resolve(null), 3000);
   });
 }
 
-function drawPhotoPlaceholder(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  title: string
-) {
-  doc.setFillColor(226, 232, 240);
-  doc.rect(x, y, w, h, 'F');
-  doc.setDrawColor(203, 213, 225);
-  doc.rect(x, y, w, h, 'S');
-
-  doc.setTextColor(100, 116, 139);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text(title, x + w / 2 - 16, y + h / 2);
-}
-
+/**
+ * Generates and downloads an official incident closure PDF report
+ */
 export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -65,40 +53,41 @@ export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> 
   const margin = 14;
   const contentWidth = pageWidth - margin * 2;
 
-  // Header background banner
-  doc.setFillColor(12, 19, 34);
+  // 1. Top Header Bar (Dark Navy Theme)
+  doc.setFillColor(12, 19, 34); // #0c1322
   doc.rect(0, 0, pageWidth, 28, 'F');
 
-  // Title in header
+  // Gold accent line
+  doc.setFillColor(245, 158, 11); // #f59e0b
+  doc.rect(0, 28, pageWidth, 1.5, 'F');
+
+  // Header Title
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('QAWAQ AI', margin, 14);
+  doc.setFontSize(14);
+  doc.text('QAWAQ  //  SEGURIDAD', margin, 12);
 
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text('SISTEMA INTELIGENTE DE GESTIÓN Y AUDITORÍA SSOMA EN TIEMPO REAL', margin, 20);
+  doc.setTextColor(203, 213, 225); // #cbd5e1
+  doc.text('SUPERVISIÓN DE SEGURIDAD EN CONSTRUCCIÓN', margin, 17);
+  doc.text('SISTEMA CCTV DE DETECCIÓN Y REGISTRO DE RIESGOS', margin, 22);
 
-  // Badge Top Right
+  // Right Header badge
   doc.setFillColor(30, 41, 59);
-  doc.roundedRect(pageWidth - margin - 52, 6, 52, 16, 2, 2, 'F');
-  doc.setDrawColor(245, 158, 11);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(pageWidth - margin - 52, 6, 52, 16, 2, 2, 'S');
-
+  doc.roundedRect(pageWidth - margin - 48, 6, 48, 16, 2, 2, 'F');
   doc.setTextColor(245, 158, 11);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.text('ACTA TÉCNICA OFICIAL', pageWidth - margin - 49, 12);
+  doc.text('ACTA DE SUBSANACIÓN', pageWidth - margin - 45, 12);
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(8);
-  doc.text(`N° ${caseItem.id}`, pageWidth - margin - 49, 18);
+  doc.text(`N° ${caseItem.id}`, pageWidth - margin - 45, 18);
 
   let y = 36;
 
-  // Document Title Box
-  doc.setFillColor(241, 245, 249);
+  // 2. Document Title Box
+  doc.setFillColor(241, 245, 249); // light gray
   doc.roundedRect(margin, y, contentWidth, 14, 2, 2, 'F');
   doc.setDrawColor(203, 213, 225);
   doc.roundedRect(margin, y, contentWidth, 14, 2, 2, 'S');
@@ -120,14 +109,14 @@ export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> 
     timeStyle: 'short',
   });
   doc.text(
-    `Fecha de Emisión: ${closureDateStr}  |  Obra: Proyecto Central · Sistema de Seguridad SST`,
+    `Fecha de Emisión: ${closureDateStr}  |  Obra: Torre Andina - Proyecto Residencial`,
     margin + 4,
     y + 11
   );
 
   y += 18;
 
-  // Section 1: Incident Metadata
+  // 3. Section 1: Incident Metadata (Table layout)
   doc.setFillColor(15, 23, 42);
   doc.rect(margin, y, contentWidth, 6, 'F');
   doc.setTextColor(255, 255, 255);
@@ -138,159 +127,247 @@ export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> 
   y += 6;
 
   const col1X = margin;
-  const col2X = margin + contentWidth / 2;
-  const rowH = 6.5;
+  const col1W = 45;
+  const col2X = margin + col1W;
+  const col2W = contentWidth - col1W;
 
-  const drawRow = (
-    label1: string,
-    val1: string,
-    label2: string,
-    val2: string,
-    isEven: boolean
-  ) => {
-    if (isEven) {
-      doc.setFillColor(248, 250, 252);
-      doc.rect(margin, y, contentWidth, rowH, 'F');
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text(label1, col1X + 3, y + 4.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(val1, col1X + 34, y + 4.5);
+  const metadataRows: [string, string][] = [
+    ['Código de Incidencia:', `${caseItem.id} (Estado: ${caseItem.estado.toUpperCase()})`],
+    ['Clasificación del Riesgo:', `${caseItem.tipo} · Nivel: ${caseItem.urgencia.toUpperCase()}`],
+    ['Ubicación y Frente:', `${caseItem.ubicacion} (${caseItem.frente})`],
+    [
+      'Detección y Hora:',
+      `${new Date(caseItem.fechaCreacion).toLocaleString('es-PE')} · Vía ${caseItem.detectadoPor}${
+        caseItem.confianzaIA ? ` (Confianza IA: ${caseItem.confianzaIA}%)` : ''
+      }`,
+    ],
+    ['Personal Responsable:', `${caseItem.responsable}`],
+    ['Descripción del Hecho:', `${caseItem.descripcion}`],
+  ];
 
-    doc.setTextColor(71, 85, 105);
-    doc.text(label2, col2X + 3, y + 4.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(val2, col2X + 34, y + 4.5);
-
+  metadataRows.forEach(([label, value]) => {
+    doc.setFillColor(248, 250, 252);
+    doc.rect(col1X, y, col1W, 6.5, 'F');
     doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
-    y += rowH;
-  };
+    doc.rect(col1X, y, col1W, 6.5, 'S');
 
-  drawRow('Tipo de Riesgo:', caseItem.tipo, 'Nivel Prioridad:', caseItem.prioridad, false);
-  drawRow('Ubicación:', caseItem.ubicacion, 'Frente Asignado:', caseItem.frente, true);
-  drawRow('Responsable:', caseItem.asignadoA?.nombre || caseItem.responsable, 'Detección:', caseItem.detectadoPor, false);
-  drawRow(
-    'Hora Detección:',
-    new Date(caseItem.fechaCreacion).toLocaleTimeString('es-PE'),
-    'Estado Actual:',
-    caseItem.estado.toUpperCase(),
-    true
-  );
+    doc.setFillColor(255, 255, 255);
+    doc.rect(col2X, y, col2W, 6.5, 'F');
+    doc.rect(col2X, y, col2W, 6.5, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(51, 65, 85);
+    doc.text(label, col1X + 2, y + 4.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    // Truncate if too long to prevent overflow
+    const cleanVal = doc.splitTextToSize(value, col2W - 4);
+    doc.text(cleanVal[0] || '', col2X + 2, y + 4.5);
+
+    y += 6.5;
+  });
 
   y += 4;
 
-  // Section 2: Photographic Evidence (Before vs After)
+  // 4. Section 2: Photographic Evidence Comparison
   doc.setFillColor(15, 23, 42);
   doc.rect(margin, y, contentWidth, 6, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('2. REGISTRO FOTOGRÁFICO DE MITIGACIÓN (AUDITORÍA VISUAL)', margin + 3, y + 4.2);
+  doc.text('2. REGISTRO FOTOGRÁFICO DE EVIDENCIAS (ANTES Y DESPUÉS)', margin + 3, y + 4.2);
 
   y += 8;
 
-  const photoWidth = (contentWidth - 6) / 2;
-  const photoHeight = 58;
+  const photoCardW = (contentWidth - 6) / 2;
+  const photoCardH = 46;
 
-  // Before Box (Red border)
+  // Try fetching base64 images
+  let beforeDataUrl: string | null = null;
+  let afterDataUrl: string | null = null;
+
+  try {
+    if (caseItem.fotoUrl) {
+      beforeDataUrl = await getBase64ImageFromUrl(caseItem.fotoUrl);
+    }
+    const resolvedUrl = caseItem.fotoSolucionUrl || caseItem.fotoUrl;
+    if (resolvedUrl) {
+      afterDataUrl = await getBase64ImageFromUrl(resolvedUrl);
+    }
+  } catch (e) {
+    console.warn('Image fetch failed for PDF', e);
+  }
+
+  // Card Left: Evidencia Antes (Infracción)
+  const leftX = margin;
+  doc.setFillColor(254, 242, 242); // soft red
+  doc.roundedRect(leftX, y, photoCardW, photoCardH, 2, 2, 'F');
   doc.setDrawColor(239, 68, 68);
-  doc.setLineWidth(0.6);
-  doc.rect(margin, y, photoWidth, photoHeight, 'S');
+  doc.roundedRect(leftX, y, photoCardW, photoCardH, 2, 2, 'S');
 
-  // Label ANTES
   doc.setFillColor(239, 68, 68);
-  doc.rect(margin, y, photoWidth, 6, 'F');
+  doc.rect(leftX, y, photoCardW, 5.5, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('CONDICIÓN INICIAL / DETECCIÓN (ANTES)', margin + 3, y + 4.2);
+  doc.setFontSize(6.5);
+  doc.text('EVIDENCIA INICIAL: CONDICIÓN SUBESTÁNDAR', leftX + 3, y + 4);
 
-  const beforeImg = await getBase64ImageFromUrl(caseItem.fotoUrl);
-  if (beforeImg) {
+  if (beforeDataUrl) {
     try {
-      doc.addImage(beforeImg, 'JPEG', margin + 1, y + 7, photoWidth - 2, photoHeight - 8);
+      doc.addImage(beforeDataUrl, 'JPEG', leftX + 2, y + 7, photoCardW - 4, photoCardH - 14);
     } catch {
-      drawPhotoPlaceholder(doc, margin + 1, y + 7, photoWidth - 2, photoHeight - 8, 'Foto Detección');
+      drawPhotoPlaceholder(doc, leftX + 2, y + 7, photoCardW - 4, photoCardH - 14, 'Foto Infracción CCTV');
     }
   } else {
-    drawPhotoPlaceholder(doc, margin + 1, y + 7, photoWidth - 2, photoHeight - 8, 'Foto Detección');
+    drawPhotoPlaceholder(doc, leftX + 2, y + 7, photoCardW - 4, photoCardH - 14, 'Foto Infracción CCTV');
   }
 
-  // After Box (Green border)
-  const afterX = margin + photoWidth + 6;
+  doc.setTextColor(185, 28, 28);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text(`Detección en Tiempo Real · Alerta Crítica`, leftX + 3, y + photoCardH - 2);
+
+  // Card Right: Evidencia Después (Solución)
+  const rightX = margin + photoCardW + 6;
+  doc.setFillColor(240, 253, 244); // soft green
+  doc.roundedRect(rightX, y, photoCardW, photoCardH, 2, 2, 'F');
   doc.setDrawColor(16, 185, 129);
-  doc.setLineWidth(0.6);
-  doc.rect(afterX, y, photoWidth, photoHeight, 'S');
+  doc.roundedRect(rightX, y, photoCardW, photoCardH, 2, 2, 'S');
 
-  // Label DESPUES
   doc.setFillColor(16, 185, 129);
-  doc.rect(afterX, y, photoWidth, 6, 'F');
+  doc.rect(rightX, y, photoCardW, 5.5, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('SUBSANACIÓN EN CAMPO (DESPUÉS)', afterX + 3, y + 4.2);
+  doc.setFontSize(6.5);
+  doc.text('EVIDENCIA FINAL: CONDICIÓN SUBSANADA', rightX + 3, y + 4);
 
-  const afterImgUrl = caseItem.evidenciaCorreccion?.fotoUrl || caseItem.fotoSolucionUrl || caseItem.fotoUrl;
-  const afterImg = await getBase64ImageFromUrl(afterImgUrl);
-  if (afterImg) {
+  if (afterDataUrl) {
     try {
-      doc.addImage(afterImg, 'JPEG', afterX + 1, y + 7, photoWidth - 2, photoHeight - 8);
+      doc.addImage(afterDataUrl, 'JPEG', rightX + 2, y + 7, photoCardW - 4, photoCardH - 14);
     } catch {
-      drawPhotoPlaceholder(doc, afterX + 1, y + 7, photoWidth - 2, photoHeight - 8, 'Foto Subsanación');
+      drawPhotoPlaceholder(doc, rightX + 2, y + 7, photoCardW - 4, photoCardH - 14, 'Inspección Subsanada OK');
     }
   } else {
-    drawPhotoPlaceholder(doc, afterX + 1, y + 7, photoWidth - 2, photoHeight - 8, 'Foto Subsanación');
+    drawPhotoPlaceholder(doc, rightX + 2, y + 7, photoCardW - 4, photoCardH - 14, 'Inspección Subsanada OK');
   }
 
-  y += photoHeight + 6;
+  doc.setTextColor(4, 120, 87);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text('Verificado en Campo · Conforme Seguridad', rightX + 3, y + photoCardH - 2);
 
-  // Section 3: Technical Mitigation & Action Plan
+  y += photoCardH + 5;
+
+  // 5. Section 3: Dictamen y Medidas Correctivas
   doc.setFillColor(15, 23, 42);
   doc.rect(margin, y, contentWidth, 6, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('3. DICTAMEN TÉCNICO Y MEDIDAS CORRECTIVAS APLICADAS', margin + 3, y + 4.2);
+  doc.text('3. MEDIDAS CORRECTIVAS Y DICTAMEN DE CIERRE', margin + 3, y + 4.2);
 
-  y += 8;
+  y += 7;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  // Box Medida Aplicada
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, contentWidth, 11, 1.5, 1.5, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(margin, y, contentWidth, 11, 1.5, 1.5, 'S');
+
   doc.setTextColor(71, 85, 105);
-  doc.text('Descripción del Hallazgo:', margin + 2, y);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(15, 23, 42);
-  const descLines = doc.splitTextToSize(caseItem.descripcion, contentWidth - 40);
-  doc.text(descLines, margin + 36, y);
-
-  y += Math.max(descLines.length * 4, 7);
-
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text('Acción de Subsanación:', margin + 2, y);
+  doc.setFontSize(7);
+  doc.text('MEDIDA DE CONTROL INMEDIATA APLICADA:', margin + 3, y + 4);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  const accionText =
-    caseItem.evidenciaCorreccion?.nota ||
-    caseItem.medidaAplicada ||
-    'Personal debidamente equipado según norma G.050. Se verificó charla de seguridad de 5 minutos y permiso de trabajo de alto riesgo (PETAR).';
-  const accionLines = doc.splitTextToSize(accionText, contentWidth - 40);
-  doc.text(accionLines, margin + 36, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  const measureText = caseItem.medidaAplicada || 'Dotación de EPP certificado y paralización temporal preventiva.';
+  doc.text(measureText, margin + 3, y + 8.5);
 
-  y += Math.max(accionLines.length * 4, 8) + 4;
+  y += 13;
 
-  // Section 4: Signatures & Validation Block
+  // Box Dictamen Cierre
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, contentWidth, 16, 1.5, 1.5, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(margin, y, contentWidth, 16, 1.5, 1.5, 'S');
+
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.text('DICTAMEN TÉCNICO DEL SUPERVISOR DE SEGURIDAD:', margin + 3, y + 4);
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  const dictamenText = caseItem.dictamenCierre ||
+    'Se inspeccionó personalmente la zona. Se verificó el uso continuo de EPP normado y se impartió charla de 5 min al personal involucrado. Riesgo mitigado al 100%.';
+  const splitDictamen = doc.splitTextToSize(dictamenText, contentWidth - 6);
+  doc.text(splitDictamen, margin + 3, y + 8);
+
+  y += 18;
+
+  // 6. Section 4: Marco Normativo y Legal
+  doc.setFillColor(15, 23, 42);
+  doc.rect(margin, y, contentWidth, 6, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('4. CONFORMIDAD Y CUMPLIMIENTO DEL MARCO NORMATIVO VIGENTE', margin + 3, y + 4.2);
+
+  y += 7;
+
+  const normatives = [
+    {
+      code: 'Norma Técnica G.050',
+      title: 'Seguridad durante la Construcción (Reglamento Nacional de Edificaciones)',
+      status: 'CONFORME Y CERTIFICADO [✓]',
+    },
+    {
+      code: 'D.S. N.º 011-2019-TR',
+      title: 'Reglamento de Seguridad y Salud en el Trabajo para el Sector Construcción',
+      status: 'CONFORME Y VERIFICADO [✓]',
+    },
+    {
+      code: 'Ley N° 29783',
+      title: 'Ley de Seguridad y Salud en el Trabajo del Perú (Arts. 21 y 97)',
+      status: 'AUDITADO SIN OBSERVACIONES [✓]',
+    },
+  ];
+
+  normatives.forEach((norm) => {
+    doc.setFillColor(240, 253, 244);
+    doc.rect(margin, y, contentWidth, 6, 'F');
+    doc.setDrawColor(187, 247, 208);
+    doc.rect(margin, y, contentWidth, 6, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(22, 101, 52);
+    doc.text(`${norm.code}:`, margin + 3, y + 4.2);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text(norm.title, margin + 38, y + 4.2);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(21, 128, 61);
+    doc.text(norm.status, contentWidth + margin - 50, y + 4.2);
+
+    y += 6.5;
+  });
+
+  y += 5;
+
+  // 7. Signatures & Digital Certification Box
   const sigBoxW = (contentWidth - 6) / 2;
   const sigBoxH = 24;
 
+  // Left Signature: Prevencionista / Supervisor
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(margin, y, sigBoxW, sigBoxH, 1.5, 1.5, 'F');
   doc.setDrawColor(203, 213, 225);
@@ -303,12 +380,13 @@ export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  doc.text('Supervisor de Frente · CIP 184920', margin + 6, y + 11);
-  doc.text('Firma Digital Electrónica Verificada', margin + 6, y + 15);
+  doc.text('Supervisor de Seguridad · CIP 184920', margin + 6, y + 11);
+  doc.text('Firma Digital Electrónica Verificada (Ley 27269)', margin + 6, y + 15);
   doc.setTextColor(16, 185, 129);
   doc.setFont('helvetica', 'bold');
   doc.text('ESTADO: SUBSANACIÓN APROBADA', margin + 6, y + 20);
 
+  // Right Seal: QAWAQ Digital Seal
   const sealX = margin + sigBoxW + 6;
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(sealX, y, sigBoxW, sigBoxH, 1.5, 1.5, 'F');
@@ -318,354 +396,48 @@ export async function generateCasePdfReport(caseItem: CaseItem): Promise<jsPDF> 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(245, 158, 11);
-  doc.text('QAWAQ · CERTIFICACIÓN AUTOMÁTICA', sealX + 6, y + 7);
+  doc.text('QAWAQ // CERTIFICACIÓN AUTOMÁTICA', sealX + 6, y + 7);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Hash de Seguridad: QW-${caseItem.id}-SEC77A9`, sealX + 6, y + 11);
+  doc.text(`Hash de Seguridad: QW-${caseItem.id}-SEC77A9024`, sealX + 6, y + 11);
   doc.text('Registro Auditado en Servidor Seguro de Obra', sealX + 6, y + 15);
   doc.setTextColor(59, 130, 246);
   doc.setFont('helvetica', 'bold');
-  doc.text('RESOLUCIÓN: ' + (caseItem.tiempoAbierto || '18 min'), sealX + 6, y + 20);
+  doc.text('TIEMPO TOTAL CIERRE: ' + (caseItem.tiempoAbierto || '18 min'), sealX + 6, y + 20);
 
+  // Bottom Footer Bar
   doc.setFillColor(12, 19, 34);
   doc.rect(0, pageHeight - 10, pageWidth, 10, 'F');
   doc.setTextColor(148, 163, 184);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.text(
-    'QAWAQ · Documento Válido para Auditorías de Seguridad y Fiscalizaciones Laborales (SUNAFIL / Ley 29783)',
+    'QAWAQ · Documento Válido para Auditorías de Seguridad y Fiscalizaciones Laborales (SUNAFIL)',
     margin,
     pageHeight - 4
   );
+  doc.text('Página 1 de 1', pageWidth - margin - 15, pageHeight - 4);
   doc.text('Página 1 de 1', pageWidth - margin - 15, pageHeight - 4);
 
   return doc;
 }
 
-/**
- * Generates an Executive Multi-Section Risk & Safety Metrics Summary PDF for Gerencia
- */
-export async function generateExecutiveMetricsPdf(
-  cases: CaseItem[],
-  options?: {
-    projectName?: string;
-    authorRole?: string;
-  }
-): Promise<jsPDF> {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
-
-  const totalCases = cases.length;
-  const closedCases = cases.filter((c) => c.estado === 'Cerrado').length;
-  const openCases = totalCases - closedCases;
-  const criticalCases = cases.filter((c) => c.prioridad === 'Crítico').length;
-  const slaCompliance = totalCases > 0 ? Math.round((closedCases / totalCases) * 100) : 100;
-
-  // PAGE 1: Executive Dashboard & Operational KPIs
-  // Header
-  doc.setFillColor(12, 19, 34);
-  doc.rect(0, 0, pageWidth, 28, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('QAWAQ AI · GERENCIA GENERAL', margin, 13);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text(
-    'INFORME EJECUTIVO DE SEGURIDAD, SALUD EN EL TRABAJO Y GESTIÓN DE RIESGOS (SST)',
-    margin,
-    19
-  );
-
-  doc.setFillColor(30, 41, 59);
-  doc.roundedRect(pageWidth - margin - 52, 6, 52, 16, 2, 2, 'F');
-  doc.setDrawColor(245, 158, 11);
-  doc.setLineWidth(0.4);
-  doc.roundedRect(pageWidth - margin - 52, 6, 52, 16, 2, 2, 'S');
-
-  doc.setTextColor(245, 158, 11);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('REPORTE GERENCIAL OFICIAL', pageWidth - margin - 50, 11.5);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(7.5);
-  doc.text(
-    new Date().toLocaleDateString('es-PE', { dateStyle: 'medium' }),
-    pageWidth - margin - 50,
-    17
-  );
-
-  let y = 35;
-
-  // Title block
-  doc.setFillColor(241, 245, 249);
-  doc.roundedRect(margin, y, contentWidth, 14, 2, 2, 'F');
-  doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, y, contentWidth, 14, 2, 2, 'S');
-
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.text('ESTADO DE DESEMPEÑO PREVENTIVO Y CUMPLIMIENTO DE SLA EN OBRA', margin + 4, y + 6);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(
-    `Marco Legal: Ley N° 29783 · Norma Técnica G.050 · D.S. N° 011-2019-TR | Proyecto: ${
-      options?.projectName || 'Obra Central'
-    }`,
-    margin + 4,
-    y + 11
-  );
-
-  y += 18;
-
-  // Section 1: Executive KPI Cards Grid
-  doc.setFillColor(15, 23, 42);
-  doc.rect(margin, y, contentWidth, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('1. RESUMEN MACRO DE INDICADORES CLAVE (KPIs)', margin + 3, y + 4.2);
-
-  y += 9;
-
-  const cardW = (contentWidth - 9) / 4;
-  const cardH = 20;
-
-  const drawKpiCard = (
-    x: number,
-    title: string,
-    value: string,
-    sub: string,
-    valueColor: [number, number, number]
-  ) => {
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, y, cardW, cardH, 2, 2, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x, y, cardW, cardH, 2, 2, 'S');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(title.toUpperCase(), x + 3, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    doc.text(value, x + 3, y + 13);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(sub, x + 3, y + 17.5);
-  };
-
-  drawKpiCard(margin, 'Total Observaciones', `${totalCases}`, `${closedCases} cerrados`, [15, 23, 42]);
-  drawKpiCard(
-    margin + cardW + 3,
-    'Tasa de Subsanación',
-    `${slaCompliance}%`,
-    'Resolución en SLA',
-    [16, 185, 129]
-  );
-  drawKpiCard(
-    margin + (cardW + 3) * 2,
-    'Casos Activos',
-    `${openCases}`,
-    `${criticalCases} críticos`,
-    [245, 158, 11]
-  );
-  drawKpiCard(
-    margin + (cardW + 3) * 3,
-    'Horas Sin Accidentes',
-    '48,250',
-    'Índice Severidad 0.0',
-    [59, 130, 246]
-  );
-
-  y += cardH + 7;
-
-  // Section 2: Performance by Workfront Table
-  doc.setFillColor(15, 23, 42);
-  doc.rect(margin, y, contentWidth, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('2. DESEMPEÑO OPERATIVO Y EFECTIVIDAD POR FRENTE DE TRABAJO', margin + 3, y + 4.2);
-
-  y += 6;
-
-  // Table Headers
+function drawPhotoPlaceholder(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  title: string
+) {
   doc.setFillColor(226, 232, 240);
-  doc.rect(margin, y, contentWidth, 6, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(30, 41, 59);
-
-  doc.text('FRENTE DE TRABAJO', margin + 3, y + 4.2);
-  doc.text('SUPERVISOR RESPONSABLE', margin + 46, y + 4.2);
-  doc.text('TOTAL RIESGOS', margin + 98, y + 4.2);
-  doc.text('SUBSANADOS', margin + 128, y + 4.2);
-  doc.text('% CUMPLIMIENTO', margin + 154, y + 4.2);
-
-  y += 6;
-
-  const frentesSummary = [
-    { frente: 'Frente Estructuras', sup: 'Ing. Carlos Mendoza', tot: 8, res: 7, pct: '87.5%' },
-    { frente: 'Frente Acabados', sup: 'Capataz Juan Pérez', tot: 5, res: 5, pct: '100.0%' },
-    { frente: 'Frente Excavación', sup: 'Ing. Marcos Ruiz', tot: 4, res: 4, pct: '100.0%' },
-    { frente: 'Frente Instalaciones', sup: 'Ing. David Torres', tot: 3, res: 2, pct: '66.7%' },
-  ];
-
-  frentesSummary.forEach((f, idx) => {
-    if (idx % 2 === 1) {
-      doc.setFillColor(248, 250, 252);
-      doc.rect(margin, y, contentWidth, 6, 'F');
-    }
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(15, 23, 42);
-    doc.text(f.frente, margin + 3, y + 4.2);
-    doc.text(f.sup, margin + 46, y + 4.2);
-    doc.text(`${f.tot}`, margin + 104, y + 4.2);
-    doc.setTextColor(16, 185, 129);
-    doc.text(`${f.res}`, margin + 134, y + 4.2);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(15, 23, 42);
-    doc.text(f.pct, margin + 158, y + 4.2);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y + 6, margin + contentWidth, y + 6);
-    y += 6;
-  });
-
-  y += 6;
-
-  // Section 3: Root Cause & Priority Risk Analysis
-  doc.setFillColor(15, 23, 42);
-  doc.rect(margin, y, contentWidth, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('3. ANÁLISIS DE PELIGROS RECURRENTES Y MEDIDAS PREVENTIVAS', margin + 3, y + 4.2);
-
-  y += 7;
-
-  const causes = [
-    {
-      tipo: 'Trabajo en Altura / Sin Arnés',
-      pct: '38%',
-      medida: 'Verificación estricta de líneas de vida y charlas de 5 min obligatorias.',
-    },
-    {
-      tipo: 'Ausencia de EPP Básico (Casco/Lentes)',
-      pct: '29%',
-      medida: 'Control automatizado por CCTV con alerta instantánea al capataz.',
-    },
-    {
-      tipo: 'Interferencia en Zona de Izaje de Grúa',
-      pct: '19%',
-      medida: 'Delimitación física con mallas de seguridad y vigías dedicados.',
-    },
-    {
-      tipo: 'Tableros Eléctricos Provisionales',
-      pct: '14%',
-      medida: 'Inspección técnica diaria por electricista habilitado según CNE.',
-    },
-  ];
-
-  causes.forEach((c) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(245, 158, 11);
-    doc.text(`• ${c.tipo} (${c.pct}):`, margin + 3, y);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    doc.text(c.medida, margin + 58, y);
-    y += 5.5;
-  });
-
-  y += 4;
-
-  // Section 4: Formal Approvals & Executive Signatures
-  doc.setFillColor(15, 23, 42);
-  doc.rect(margin, y, contentWidth, 6, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('4. APROBACIÓN Y CONFORMIDAD GERENCIAL', margin + 3, y + 4.2);
-
-  y += 8;
-
-  const sigBoxW = (contentWidth - 6) / 2;
-  const sigBoxH = 24;
-
-  // Gerencia Signature Box
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, y, sigBoxW, sigBoxH, 1.5, 1.5, 'F');
+  doc.rect(x, y, w, h, 'F');
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, y, sigBoxW, sigBoxH, 1.5, 1.5, 'S');
+  doc.rect(x, y, w, h, 'S');
 
+  doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('DIRECCIÓN DE OPERACIONES / GERENCIA', margin + 6, y + 7);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text('Revisión Estratégica de Métricas SST', margin + 6, y + 11);
-  doc.text('Aprobado conforme al Plan Anual de Seguridad', margin + 6, y + 15);
-  doc.setTextColor(16, 185, 129);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ESTADO: CONFORME', margin + 6, y + 20);
-
-  // SSOMA Seal Box
-  const sealX = margin + sigBoxW + 6;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(sealX, y, sigBoxW, sigBoxH, 1.5, 1.5, 'F');
-  doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(sealX, y, sigBoxW, sigBoxH, 1.5, 1.5, 'S');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(245, 158, 11);
-  doc.text('QAWAQ · CERTIFICACIÓN EJECUTIVA SST', sealX + 6, y + 7);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`Código Auditoría: QW-EXEC-${Date.now().toString(36).toUpperCase()}`, sealX + 6, y + 11);
-  doc.text('Trazabilidad en Servidor Central y CCTV', sealX + 6, y + 15);
-  doc.setTextColor(59, 130, 246);
-  doc.setFont('helvetica', 'bold');
-  doc.text('SISTEMA: ACTIVO Y SIN DESVIACIONES', sealX + 6, y + 20);
-
-  // Footer
-  doc.setFillColor(12, 19, 34);
-  doc.rect(0, pageHeight - 10, pageWidth, 10, 'F');
-  doc.setTextColor(148, 163, 184);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text(
-    'QAWAQ AI · Reporte Ejecutivo para Directorio y Auditorías Laborales · Generado automáticamente',
-    margin,
-    pageHeight - 4
-  );
-  doc.text('Página 1 de 1', pageWidth - margin - 15, pageHeight - 4);
-
-  return doc;
+  doc.text(title, x + w / 2 - 16, y + h / 2);
 }

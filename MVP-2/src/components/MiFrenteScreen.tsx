@@ -2,296 +2,235 @@ import React, { useState } from 'react';
 import {
   Layers,
   CheckCircle2,
-  Clock,
   AlertTriangle,
-  HardHat,
-  Users,
-  ChevronRight,
+  Clock,
   TrendingUp,
+  ExternalLink,
   ShieldCheck,
-  Calendar,
-  Sparkles,
+  UserCheck,
+  Building,
 } from 'lucide-react';
 import { useCases } from '../context/CaseContext';
 import { useRole } from '../context/RoleContext';
-import { FRENTES_OBRA, FRENTE_IMAGES, ASSETS } from '../constants';
 import { formatSlaCountdown, useLiveTimer } from '../utils/sla';
 import { CaseDetailModal } from './CaseDetailModal';
-import { CaseItem } from '../types';
 
 export const MiFrenteScreen: React.FC = () => {
-  const { cases } = useCases();
-  const { activeSupervisor } = useRole();
-  const now = useLiveTimer(3000);
+  const { cases, selectedCaseForDetailId, setSelectedCaseForDetailId } = useCases();
+  const { activeSupervisor, setActiveSupervisor, availableSupervisors } = useRole();
+  const now = useLiveTimer(5000);
 
-  // Default to supervisor's assigned front, with option to switch
-  const [selectedFrente, setSelectedFrente] = useState<string>(
-    activeSupervisor.frenteAsignado || FRENTES_OBRA[1]
+  // We can filter by the active supervisor's front, or allow choosing a specific front
+  const [selectedFrente, setSelectedFrente] = useState<string>(activeSupervisor.frenteAsignado);
+
+  // Filter cases belonging to this frente
+  const frenteCases = cases.filter(
+    (c) =>
+      c.frente.toLowerCase().includes(selectedFrente.toLowerCase()) ||
+      selectedFrente.toLowerCase().includes(c.frente.toLowerCase()) ||
+      c.ubicacion.toLowerCase().includes(selectedFrente.toLowerCase())
   );
-  const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
 
-  // Filter cases of this frente
-  const frenteCases = cases.filter((c) => c.frente === selectedFrente);
-  const total = frenteCases.length;
-  const closed = frenteCases.filter((c) => c.estado === 'Cerrado').length;
-  const active = total - closed;
-  const inValidation = frenteCases.filter(
-    (c) => c.estado === 'Pendiente de Validación SSOMA'
-  ).length;
+  // If no match found by string, fallback to cases assigned to or matching Frente B
+  const displayCases =
+    frenteCases.length > 0
+      ? frenteCases
+      : cases.filter((c) => c.frente === 'Frente B' || c.frente.includes('Frente B'));
 
-  // Overdue count
-  const overdueCount = frenteCases.filter((c) => {
-    if (c.estado === 'Cerrado') return false;
-    return formatSlaCountdown(c.plazoObjetivo, c.estado, now).isVencido;
+  // Metrics computation
+  const totalCases = displayCases.length;
+  const closedCases = displayCases.filter((c) => c.estado === 'Cerrado').length;
+  const openCases = totalCases - closedCases;
+
+  // % Compliance SLA
+  // A case complies if it closed within plazoObjetivo, or if it is currently not overdue
+  const compliantCases = displayCases.filter((c) => {
+    if (c.estado === 'Cerrado') {
+      return (c.fechaCierre || 0) <= c.plazoObjetivo;
+    }
+    return now <= c.plazoObjetivo;
   }).length;
 
-  // SLA Compliance rate
-  const complianceRate =
-    total > 0
-      ? Math.max(0, Math.round(((total - overdueCount) / total) * 100))
-      : 100;
-
-  // Health status
-  const healthStatus =
-    overdueCount === 0 && complianceRate >= 80
-      ? { label: 'SALUDABLE · CUMPLE PROTOCOLO', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' }
-      : overdueCount > 1
-      ? { label: 'ALERTA · CASOS VENCIDOS', color: 'text-red-400 bg-red-500/15 border-red-500/30' }
-      : { label: 'PRECAUCIÓN · ATENCIÓN PRIORITARIA', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30' };
+  const compliancePercent = totalCases > 0 ? Math.round((compliantCases / totalCases) * 100) : 100;
+  const overdueCount = displayCases.filter((c) => c.estado !== 'Cerrado' && now > c.plazoObjetivo).length;
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-5 max-w-5xl mx-auto animate-fade-in">
-      {/* Header Banner with Front Photo */}
-      <div id="frente-live-cctv" className="relative rounded-2xl overflow-hidden border border-[#222a3d] shadow-xl bg-[#0c1322]">
-        <div className="h-32 sm:h-40 w-full relative bg-black">
-          <img
-            src={FRENTE_IMAGES[selectedFrente] || ASSETS.frenteLosa}
-            alt={selectedFrente}
-            className="w-full h-full object-cover opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0c1322] via-[#0c1322]/60 to-black/40" />
-          <div className="absolute top-3 left-3 flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 backdrop-blur-sm">
-              SALUD OPERATIVA · MI FRENTE
-            </span>
-            <span className="font-mono text-[10px] text-white/80 backdrop-blur-sm px-2 py-0.5 rounded bg-black/50">
-              Supervisión en Campo
-            </span>
-          </div>
-
-          <div className="absolute bottom-3 left-4 right-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 animate-fade-in">
+      {/* Frente Header Banner */}
+      <div className="bg-[#0f172a] p-4 sm:p-5 rounded-2xl border border-[#222a3d] shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#38bdf8]/15 border border-[#38bdf8]/30 flex items-center justify-center shrink-0">
+              <Layers className="w-6 h-6 text-[#38bdf8]" />
+            </div>
             <div>
-              <h1 className="font-['Chivo'] font-black text-xl sm:text-2xl text-white uppercase tracking-tight drop-shadow-md">
-                {selectedFrente}
-              </h1>
-              <p className="text-xs text-[#cbd5e1] mt-0.5">
-                Diagnóstico de seguridad para la reunión de 5 minutos, cambio de guardia y relevo de cuadrillas.
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-['Chivo'] font-black text-lg sm:text-xl text-[#dae2fd] uppercase tracking-wide">
+                  Panel de Control: {selectedFrente}
+                </h1>
+                <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-[#38bdf8]/20 text-[#38bdf8] font-bold border border-[#38bdf8]/40">
+                  MI FRENTE
+                </span>
+              </div>
+              <p className="text-xs text-[#94a3b8] font-mono mt-0.5">
+                Supervisor Asignado: <strong className="text-[#dae2fd]">{activeSupervisor.nombre}</strong> · {activeSupervisor.rol}
               </p>
             </div>
-
-            {/* Frente Selector */}
-            <div className="flex items-center gap-2 bg-[#131b2e]/90 backdrop-blur-md p-2 rounded-xl border border-[#334155] shrink-0 self-start sm:self-auto">
-              <Layers className="w-4 h-4 text-[#f59e0b] shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-mono text-[8px] uppercase text-[#94a3b8]">Cambiar Frente:</span>
-                <select
-                  value={selectedFrente}
-                  onChange={(e) => setSelectedFrente(e.target.value)}
-                  className="bg-transparent text-xs font-mono font-bold text-[#dae2fd] outline-none cursor-pointer"
-                >
-                  {FRENTES_OBRA.map((f) => (
-                    <option key={f} value={f} className="bg-[#0c1322] text-[#dae2fd]">
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Health Status & SLA Bar */}
-      <div id="frente-safety-score" className="bg-[#131b2e] border border-[#222a3d] p-5 rounded-2xl shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#222a3d]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#f59e0b]/15 text-[#f59e0b] flex items-center justify-center border border-[#f59e0b]/30">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-mono text-[10px] uppercase text-[#94a3b8]">Estado General del Frente</div>
-              <div className="font-['Chivo'] font-black text-lg text-[#dae2fd]">
-                Índice de Seguridad: {complianceRate}%
-              </div>
-            </div>
           </div>
 
-          <div
-            className={`px-3 py-1.5 rounded-xl border font-mono text-xs font-bold uppercase tracking-wider self-start sm:self-auto ${healthStatus.color}`}
-          >
-            {healthStatus.label}
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs font-mono text-[#94a3b8]">
-            <span>Cumplimiento de Plazos Legales (SLA)</span>
-            <strong className="text-[#dae2fd]">{complianceRate}% dentro del plazo</strong>
-          </div>
-          <div className="w-full h-3 bg-[#0b1326] rounded-full overflow-hidden border border-[#222a3d]">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                complianceRate >= 80
-                  ? 'bg-gradient-to-r from-amber-500 to-emerald-500'
-                  : complianceRate >= 50
-                  ? 'bg-gradient-to-r from-red-500 to-amber-500'
-                  : 'bg-red-500'
-              }`}
-              style={{ width: `${complianceRate}%` }}
-            />
-          </div>
-        </div>
-
-        {/* 4 Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-          <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b]">
-            <div className="font-mono text-[9px] uppercase text-[#94a3b8]">Total Casos</div>
-            <div className="font-mono text-2xl font-black text-[#dae2fd] mt-1">{total}</div>
-            <div className="font-mono text-[9px] text-[#64748b]">En este frente</div>
-          </div>
-
-          <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b]">
-            <div className="font-mono text-[9px] uppercase text-amber-400">Activos en Obra</div>
-            <div className="font-mono text-2xl font-black text-amber-400 mt-1">{active}</div>
-            <div className="font-mono text-[9px] text-[#64748b]">Por subsanar</div>
-          </div>
-
-          <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b]">
-            <div className="font-mono text-[9px] uppercase text-emerald-400">Casos Certificados</div>
-            <div className="font-mono text-2xl font-black text-emerald-400 mt-1">{closed}</div>
-            <div className="font-mono text-[9px] text-[#64748b]">Validados por SSOMA</div>
-          </div>
-
-          <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b]">
-            <div className="font-mono text-[9px] uppercase text-red-400">Casos Vencidos</div>
-            <div
-              className={`font-mono text-2xl font-black mt-1 ${
-                overdueCount > 0 ? 'text-red-400' : 'text-[#10b981]'
-              }`}
+          {/* Frente Switcher Filter */}
+          <div className="flex items-center gap-2 bg-[#070d18] p-1.5 rounded-xl border border-[#1e293b]">
+            <Building className="w-4 h-4 text-[#94a3b8] ml-2 shrink-0" />
+            <select
+              value={selectedFrente}
+              onChange={(e) => setSelectedFrente(e.target.value)}
+              className="bg-transparent text-xs font-mono text-[#dae2fd] font-bold focus:outline-none cursor-pointer pr-2"
             >
-              {overdueCount}
+              <option value="Frente B (Losa Piso 14)" className="bg-[#0c1322]">Frente B (Losa P14)</option>
+              <option value="Frente Sur (Excavación)" className="bg-[#0c1322]">Frente Sur (Excavación)</option>
+              <option value="Frente Norte" className="bg-[#0c1322]">Frente Norte (Estructuras)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* 4 KPI Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-3 border-t border-[#1e293b]">
+          <div className="bg-[#070d18] p-3 rounded-xl border border-[#1e293b]">
+            <div className="text-[10px] font-mono uppercase text-[#94a3b8]">Total Incidentes</div>
+            <div className="font-['Chivo'] font-black text-xl text-[#dae2fd] mt-0.5">{totalCases}</div>
+            <div className="text-[10px] font-mono text-[#64748b] mt-1">Registrados en el frente</div>
+          </div>
+
+          <div className="bg-[#070d18] p-3 rounded-xl border border-[#1e293b]">
+            <div className="text-[10px] font-mono uppercase text-[#38bdf8]">Abiertos / En Campo</div>
+            <div className="font-['Chivo'] font-black text-xl text-[#38bdf8] mt-0.5">{openCases}</div>
+            <div className="text-[10px] font-mono text-[#64748b] mt-1">
+              {overdueCount > 0 ? (
+                <span className="text-red-400 font-bold">{overdueCount} vencidos</span>
+              ) : (
+                '0 vencidos'
+              )}
             </div>
-            <div className="font-mono text-[9px] text-[#64748b]">Fuera de tiempo</div>
+          </div>
+
+          <div className="bg-[#070d18] p-3 rounded-xl border border-[#1e293b]">
+            <div className="text-[10px] font-mono uppercase text-emerald-400">Subsanados / Cerrados</div>
+            <div className="font-['Chivo'] font-black text-xl text-emerald-400 mt-0.5">{closedCases}</div>
+            <div className="text-[10px] font-mono text-[#64748b] mt-1">Conformes por SSOMA</div>
+          </div>
+
+          <div className="bg-[#070d18] p-3 rounded-xl border border-[#1e293b]">
+            <div className="text-[10px] font-mono uppercase text-[#f59e0b]">Cumplimiento SLA</div>
+            <div className="font-['Chivo'] font-black text-xl text-[#f59e0b] mt-0.5">
+              {compliancePercent}%
+            </div>
+            <div className="w-full bg-[#1e293b] rounded-full h-1.5 mt-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  compliancePercent >= 80 ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+                style={{ width: `${compliancePercent}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Briefing: Reunión de 5 Minutos (Pre-Turno) */}
-      <div className="bg-[#15120a] border border-amber-500/30 p-4 sm:p-5 rounded-2xl shadow-xl space-y-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <h3 className="font-['Chivo'] font-bold text-sm sm:text-base text-amber-300 uppercase tracking-wide">
-            Guía Rápida para Charla de 5 Minutos / Relevo de Turno
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#cbd5e1]">
-          <div className="bg-[#0c1322] p-3 rounded-xl border border-amber-500/20 space-y-1">
-            <div className="font-mono text-[10px] text-amber-400 font-bold uppercase">
-              1. Puntos Críticos a Revisar Hoy:
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-[#94a3b8]">
-              <li>Uso estricto de doble línea de vida en losas y bordes de piso 14.</li>
-              <li>Inspección previa de tarjetas de andamio (verde operativo).</li>
-              <li>Verificar que no haya personal bajo cargas suspendidas de grúa.</li>
-            </ul>
-          </div>
-
-          <div className="bg-[#0c1322] p-3 rounded-xl border border-amber-500/20 space-y-1">
-            <div className="font-mono text-[10px] text-emerald-400 font-bold uppercase">
-              2. Consigna de Seguridad SSOMA:
-            </div>
-            <p className="italic text-[#94a3b8] leading-relaxed">
-              &quot;Ningún trabajo en altura inicia sin AST firmado ni verificación de EPP por el capataz. Toda condición subestándar debe reportarse antes de las 10:00 AM.&quot;
+      {/* Cases in this Frente List */}
+      <div className="bg-[#0c1322] border border-[#222a3d] rounded-2xl p-4 sm:p-5 shadow-md">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-['Chivo'] font-black text-base sm:text-lg text-[#dae2fd] uppercase tracking-wide">
+              Casos Activos e Históricos en {selectedFrente}
+            </h2>
+            <p className="text-xs text-[#94a3b8] font-mono">
+              Monitoreo del frente en tiempo real con auditoría de SLA
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Quick Cases List for this Frente */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs font-mono text-[#94a3b8] px-1">
-          <span>Casos Registrados en {selectedFrente} ({frenteCases.length})</span>
-          <span>Haz click para ver detalles y auditoría</span>
-        </div>
-
-        {frenteCases.length === 0 ? (
-          <div className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-8 text-center text-[#94a3b8] font-mono">
-            No se registran casos de riesgo en este frente operativo.
-          </div>
-        ) : (
-          frenteCases.map((item) => {
+        <div className="space-y-3">
+          {displayCases.map((item) => {
             const sla = formatSlaCountdown(item.plazoObjetivo, item.estado, now);
+            const isClosed = item.estado === 'Cerrado';
 
             return (
               <div
                 key={item.id}
-                onClick={() => setSelectedCase(item)}
-                className="bg-[#131b2e] hover:bg-[#18233a] border border-[#222a3d] hover:border-[#334155] rounded-2xl p-3.5 transition-all shadow-md cursor-pointer flex items-center justify-between gap-3 group"
+                onClick={() => setSelectedCaseForDetailId(item.id)}
+                className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer hover:bg-[#131d33] ${
+                  isClosed
+                    ? 'border-[#1e293b] bg-[#070d18]/60 opacity-80'
+                    : sla.isVencido
+                    ? 'border-red-500/40 bg-[#140a0f]'
+                    : 'border-[#222a3d] bg-[#0b1326]'
+                }`}
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-black shrink-0 border border-[#222a3d]">
-                    <img src={item.fotoUrl} alt={item.tipo} className="w-full h-full object-cover" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={item.fotoUrl}
+                      alt={item.tipo}
+                      className="w-16 h-12 sm:w-20 sm:h-14 rounded-lg object-cover border border-[#222a3d] shrink-0"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-[#f59e0b]">
+                          #{item.id}
+                        </span>
+                        <h3 className="font-['Chivo'] font-bold text-sm text-[#dae2fd]">
+                          {item.tipo}
+                        </h3>
+                        <span className="text-[10px] font-mono text-[#94a3b8]">
+                          {item.ubicacion}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#94a3b8] line-clamp-1 mt-0.5">
+                        {item.descripcion}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-[#64748b]">
+                        <span>Responsable: <strong className="text-[#dae2fd]">{item.asignadoA?.nombre || item.responsable}</strong></span>
+                        <span>·</span>
+                        <span>Prioridad: <strong className="text-[#f59e0b]">{item.prioridad}</strong></span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[10px] font-bold text-[#ffb95f]">
-                        #{item.id}
-                      </span>
-                      <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-[#1e293b] text-[#94a3b8]">
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
+                    <span
+                      className={`font-mono text-[10px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 border ${sla.badgeClass}`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {sla.text}
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          isClosed
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                        }`}
+                      >
                         {item.estado}
                       </span>
-                    </div>
-
-                    <h4 className="font-['Chivo'] font-bold text-xs sm:text-sm text-[#dae2fd] truncate mt-0.5">
-                      {item.tipo}
-                    </h4>
-
-                    <div className="text-[10px] font-mono text-[#94a3b8] truncate">
-                      {item.ubicacion} · Resp: {item.asignadoA?.nombre || item.responsable}
+                      <ExternalLink className="w-3.5 h-3.5 text-[#94a3b8]" />
                     </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <span
-                    className={`font-mono text-[11px] px-2 py-0.5 rounded border font-bold ${
-                      sla.isVencido
-                        ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                        : item.estado === 'Cerrado'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : 'bg-[#0b1326] text-[#38bdf8] border-[#1e293b]'
-                    }`}
-                  >
-                    {sla.text}
-                  </span>
-
-                  <ChevronRight className="w-4 h-4 text-[#94a3b8] group-hover:text-[#f59e0b] transition-colors" />
                 </div>
               </div>
             );
-          })
-        )}
+          })}
+        </div>
       </div>
 
       {/* Case Detail Modal */}
-      <CaseDetailModal
-        caseItem={selectedCase}
-        isOpen={Boolean(selectedCase)}
-        onClose={() => setSelectedCase(null)}
-      />
+      {selectedCaseForDetailId && (
+        <CaseDetailModal
+          caseItem={cases.find((c) => c.id === selectedCaseForDetailId) || null}
+          onClose={() => setSelectedCaseForDetailId(null)}
+        />
+      )}
     </div>
   );
 };

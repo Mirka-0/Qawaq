@@ -1,13 +1,9 @@
 import React from 'react';
-import { ShieldCheck, HardHat, Building2, UserCheck, X, ArrowRight, CheckCircle2, Compass } from 'lucide-react';
+import { ShieldCheck, HardHat, Check, UserCheck, X, ArrowRight } from 'lucide-react';
 import { useRole } from '../context/RoleContext';
 import { UserRole } from '../types';
 
-interface RoleSwitcherModalProps {
-  onStartTour?: () => void;
-}
-
-export const RoleSwitcherModal: React.FC<RoleSwitcherModalProps> = ({ onStartTour }) => {
+export const RoleSwitcherModal: React.FC = () => {
   const {
     currentRole,
     setRole,
@@ -20,264 +16,190 @@ export const RoleSwitcherModal: React.FC<RoleSwitcherModalProps> = ({ onStartTou
 
   if (!isRoleModalOpen) return null;
 
-  const roles = [
+  const roles: {
+    id: UserRole;
+    title: string;
+    badge: string;
+    desc: string;
+    icon: React.ReactNode;
+    color: string;
+    tabs: string;
+  }[] = [
     {
-      id: 'SSOMA' as UserRole,
-      title: 'SSOMA',
-      subtitle: 'SUPERVISOR DE SEGURIDAD Y SALUD EN EL TRABAJO',
-      badge: 'CONTROL TOTAL',
-      badgeColor: 'bg-[#10b981]/20 text-[#34d399] border-[#10b981]/40',
-      image:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuABeegEFG7AfAsaxlqgFvAVWE93XEN9o-gDLgibttS-ni3x7llY8BcLb440FDqcdYSRZxACtf0XeeIIxg19tfoQwqke3gK-EQL1DrK9AUXOGWDQ47V5gkmSr3hQrdHbqoBwP3KcdyV5krQFyZhXWXyiNIuxg5Qm52uk3yAUyJNHTW-0dCI2gElt4TL-3AoNprYHnqqHPT8w0cfjRzll9ILLVwo0aFkOn0ZVaKgC0QVPsTSUo7dc5gSXlQ',
-      desc: 'Auditoría en tiempo real de CCTV con IA, asignación de responsables con plazos SLA, inspecciones de campo y cierre formal de no conformidades.',
-      features: [
-        'Detección de EPP por IA en tiempo real',
-        'Asignación de plazos (SLA 4h / 12h / 24h / 48h)',
-        'Cierre de caso con validación Antes vs Después',
-        'Exportación de informes técnicos PDF',
-      ],
-      icon: <ShieldCheck className="w-5 h-5 text-[#10b981]" />,
-      actionText: 'ACCEDER COMO SSOMA',
-      accentColor: 'border-[#10b981]/40 hover:border-[#10b981]',
+      id: 'SSOMA',
+      title: 'Seguridad SSOMA',
+      badge: 'Control Total & Normativa',
+      desc: 'Supervisa cámaras CCTV, asigna responsables a casos abiertos, valida o rechaza evidencias de campo y emite certificaciones.',
+      icon: <ShieldCheck className="w-6 h-6 text-[#10b981]" />,
+      color: 'border-[#10b981]/40 bg-[#10b981]/10',
+      tabs: 'Dashboard · Cámaras CCTV · Reportar · Cerrar/Validar',
     },
     {
-      id: 'Supervisor/Capataz' as UserRole,
-      title: 'SUPERVISOR / CAPATAZ',
-      subtitle: 'RESPONSABLE DE FRENTE DE TRABAJO',
-      badge: 'CAMPO ACTIVO',
-      badgeColor: 'bg-[#f59e0b]/20 text-[#ffb95f] border-[#f59e0b]/40',
-      image:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuBCvsQNt49_kZ0wJwh_1L85IGvzaeTAaX7Xd1gObO1HqOkTqXBQlwXc8WXO2f8gDZm6aN4OwSOh3FoFmkbiMyQCEaHeo2RMqPILK3ORzbfUra-JfwEe0yQGjfx1LDxLY6shC3kTU1Fna73QaqUv2gxL6VysiLYMkji82gC6QQjHYo5iN6nIuDHiRojxTP73fk7S5AgA_SdpWHpivDAYWL0rCjd5s34ipBXLT6RLGIBf_Z-hbGXSXxIxeQ',
-      desc: 'Gestión directa de no conformidades asignadas en obra, control de plazos críticos, inicio de correcciones y subida de evidencia fotográfica.',
-      features: [
-        'Bandeja "Mis Pendientes" con temporizador SLA',
-        'Subida de evidencia fotográfica de corrección',
-        'Panel "Mi Frente" con tasa de cumplimiento',
-        'Registro de incidentes directos desde campo',
-      ],
-      icon: <HardHat className="w-5 h-5 text-[#f59e0b]" />,
-      actionText: 'ACCEDER COMO SUPERVISOR',
-      accentColor: 'border-[#f59e0b]/40 hover:border-[#f59e0b]',
-    },
-    {
-      id: 'Gerencia' as UserRole,
-      title: 'GERENCIA',
-      subtitle: 'DIRECCIÓN DE PROYECTO Y OPERACIONES',
-      badge: 'ESTRATÉGICO',
-      badgeColor: 'bg-[#38bdf8]/20 text-[#7dd3fc] border-[#38bdf8]/40',
-      image:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuA_PhafjsDKHF9v6ji6TUu6bpZO5UPeAp9vketf3VxSRS8VToflSDrGrvzeATJXACkuRrW6g6ceN7cBfVVTQO0Y19YCMi9SIznzIeoH5euoBo4erMJeFbT5oFnK7kTcd-30t1ql-p1Fpn4BVk3LBzc8Hf1mNwXKuo9NU2JiyP_Zq1h0K9Kw00UDyf2577N8etOHCMJ0s33CszKGj7agBiUFbWHqv4eGcUAFuULQXnrgCH7Xqk5DBDQ6Tg',
-      desc: 'Visualización macro de indicadores clave de seguridad, horas hombre trabajadas sin incidentes, efectividad de frentes y exportación gerencial.',
-      features: [
-        'KPI de accidentabilidad y ratio de resolución',
-        'Comparativa de desempeño entre frentes',
-        'Auditoría pasiva sin alteración de datos de campo',
-        'Reportes ejecutivos descargables',
-      ],
-      icon: <Building2 className="w-5 h-5 text-[#38bdf8]" />,
-      actionText: 'ACCEDER COMO GERENCIA',
-      accentColor: 'border-[#38bdf8]/40 hover:border-[#38bdf8]',
+      id: 'Supervisor/Capataz',
+      title: 'Supervisor / Capataz',
+      badge: 'Ejecución en Campo',
+      desc: 'Gestiona "Mis Pendientes", inicia la corrección en obra, sube evidencia fotográfica con nota técnica y analiza el SLA de "Mi Frente".',
+      icon: <HardHat className="w-6 h-6 text-[#f59e0b]" />,
+      color: 'border-[#f59e0b]/40 bg-[#f59e0b]/10',
+      tabs: 'Mis Pendientes · Mi Frente · Reportar · Cámaras CCTV',
     },
   ];
 
-  const handleStartTourClick = () => {
-    setIsRoleModalOpen(false);
-    if (onStartTour) {
-      onStartTour();
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-lg overflow-y-auto">
-      <div className="relative w-full max-w-5xl bg-[#0b1326] border border-[#222a3d] rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[95vh] flex flex-col">
-        {/* Modal Header Bar */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#222a3d] bg-[#0c1322]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center">
-              <img
-                src="/logo.svg"
-                alt="Logo Qawaq"
-                className="w-10 h-10 object-contain rounded-xl"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-['Chivo'] font-black text-base sm:text-lg tracking-wider text-[#dae2fd] uppercase">
-                  QAWAQ · CONTROL DE ACCESO
-                </span>
-              </div>
-              <p className="font-mono text-[10px] text-[#94a3b8] uppercase tracking-tight">
-                PROTOCOLO DE AUTORIZACIÓN BASADO EN ROLES · SIMULACIÓN DE LOGIN
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-2xl bg-[#0c1322] border border-[#222a3d] rounded-2xl p-5 sm:p-6 shadow-2xl overflow-y-auto max-h-[92vh]">
+        {/* Close Button */}
+        <button
+          onClick={() => setIsRoleModalOpen(false)}
+          className="absolute top-4 right-4 p-2 text-[#94a3b8] hover:text-[#dae2fd] hover:bg-[#1a2337] rounded-xl transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Header */}
+        <div className="mb-5 pr-8">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-[#f59e0b]/15 text-[#ffb95f] border border-[#f59e0b]/30">
+              SIMULACIÓN DE LOGIN // QAWAQ
+            </span>
+            <span className="font-mono text-[10px] text-[#94a3b8]">Demostración Multi-Rol</span>
           </div>
-          <button
-            onClick={() => setIsRoleModalOpen(false)}
-            className="p-2 text-[#94a3b8] hover:text-[#dae2fd] hover:bg-[#1a2337] rounded-xl transition-colors"
-            title="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="font-['Chivo'] font-black text-xl sm:text-2xl text-[#dae2fd] tracking-tight uppercase">
+            Seleccionar Rol Activo
+          </h2>
+          <p className="text-xs text-[#94a3b8] mt-1 leading-relaxed">
+            Cambia de perspectiva al instante para probar el ciclo completo de asignación, corrección en campo, validación y reporte ejecutivo sin necesidad de backend real.
+          </p>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="font-mono text-[10px] text-[#f59e0b] font-bold uppercase tracking-widest block mb-1">
-                [ SELECCIÓN DE IDENTIDAD OPERATIVA ]
-              </span>
-              <h2 className="font-['Chivo'] font-black text-xl sm:text-2xl text-[#dae2fd] uppercase tracking-tight">
-                Identifique su perfil para ingresar
-              </h2>
-              <p className="text-xs sm:text-sm text-[#94a3b8] mt-1 max-w-3xl leading-relaxed">
-                Seleccione un rol para experimentar la aplicación desde su perspectiva operativa. La interfaz, los permisos y los flujos de trabajo se adaptarán en tiempo real sin recargar la página.
-              </p>
-            </div>
-
-            {onStartTour && (
-              <button
-                type="button"
-                onClick={handleStartTourClick}
-                className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-400 font-mono text-xs font-bold uppercase transition-all shadow-sm active:scale-95 shrink-0"
+        {/* Role Cards */}
+        <div className="space-y-3">
+          {roles.map((r) => {
+            const isSelected = currentRole === r.id;
+            return (
+              <div
+                key={r.id}
+                onClick={() => {
+                  setRole(r.id);
+                  if (r.id !== 'Supervisor/Capataz') {
+                    setIsRoleModalOpen(false);
+                  }
+                }}
+                className={`p-4 rounded-xl border transition-all cursor-pointer relative ${
+                  isSelected
+                    ? 'border-[#f59e0b] bg-[#1a2337] shadow-lg shadow-[#f59e0b]/10'
+                    : 'border-[#1e293b] bg-[#0b1326] hover:border-[#334155] hover:bg-[#10192d]'
+                }`}
               >
-                <Compass className="w-4 h-4" />
-                <span>Ver Tour Guiado</span>
-              </button>
-            )}
-          </div>
-
-          {/* 3 Role Cards Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {roles.map((r) => {
-              const isSelected = currentRole === r.id;
-              return (
-                <div
-                  key={r.id}
-                  className={`group relative flex flex-col rounded-2xl border transition-all duration-300 overflow-hidden bg-[#131b2e]/90 hover:shadow-xl ${
-                    isSelected
-                      ? 'border-[#f59e0b] ring-2 ring-[#f59e0b]/50 shadow-lg shadow-[#f59e0b]/15'
-                      : 'border-[#222a3d] hover:border-[#3b4760]'
-                  }`}
-                >
-                  {/* Card Cover Image */}
-                  <div className="relative h-40 w-full overflow-hidden bg-[#0c1322]">
-                    <img
-                      src={r.image}
-                      alt={r.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 opacity-85 group-hover:opacity-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#131b2e] via-[#131b2e]/40 to-transparent" />
-                    
-                    {/* Badge top right */}
-                    <div className="absolute top-3 right-3">
-                      <span className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.8 rounded-md border backdrop-blur-md ${r.badgeColor}`}>
-                        {r.badge}
-                      </span>
-                    </div>
-
-                    {/* Role Icon top left */}
-                    <div className="absolute top-3 left-3 p-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-[#1e293b] border border-[#334155] shrink-0">
                       {r.icon}
                     </div>
-
-                    {/* Title overlay */}
-                    <div className="absolute bottom-2.5 left-3 right-3">
-                      <h3 className="font-['Chivo'] font-black text-lg text-white uppercase tracking-tight flex items-center justify-between">
-                        <span>{r.title}</span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-['Chivo'] font-bold text-base text-[#dae2fd]">
+                          {r.title}
+                        </h3>
+                        <span className="font-mono text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-[#1e293b] text-[#94a3b8] border border-[#334155]">
+                          {r.badge}
+                        </span>
                         {isSelected && (
-                          <span className="flex items-center gap-1 font-mono text-[9px] text-[#10b981] bg-[#10b981]/20 px-2 py-0.5 rounded-full border border-[#10b981]/40">
-                            <CheckCircle2 className="w-3 h-3" /> ACTIVO
+                          <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-[#10b981]/20 text-[#34d399] font-bold border border-[#10b981]/40 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> ACTIVO
                           </span>
                         )}
-                      </h3>
-                      <p className="font-mono text-[9px] text-[#f59e0b] font-bold uppercase tracking-wider">
-                        {r.subtitle}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Body description & features */}
-                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                    <p className="text-xs text-[#94a3b8] leading-relaxed">
-                      {r.desc}
-                    </p>
-
-                    <div className="space-y-1.5 pt-2 border-t border-[#222a3d]">
-                      <span className="font-mono text-[9px] font-bold text-[#d8c3ad] uppercase tracking-wider block mb-1">
-                        Capacidades clave:
-                      </span>
-                      {r.features.map((feat, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 text-[11px] text-[#dae2fd]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] shrink-0" />
-                          <span className="truncate">{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Supervisor Specific Selector if applicable */}
-                    {r.id === 'Supervisor/Capataz' && (
-                      <div className="pt-2 border-t border-[#222a3d]/80">
-                        <label className="block font-mono text-[9px] uppercase font-bold text-[#ffb95f] mb-1.5 flex items-center gap-1">
-                          <UserCheck className="w-3 h-3" /> Asignar identidad de campo:
-                        </label>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {availableSupervisors.map((sup) => {
-                            const isCurrentSup = activeSupervisor.nombre === sup.nombre;
-                            return (
-                              <button
-                                key={sup.nombre}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveSupervisor(sup);
-                                }}
-                                className={`text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between border transition-all ${
-                                  isCurrentSup
-                                    ? 'bg-[#f59e0b]/20 border-[#f59e0b] text-[#ffddb8] font-bold'
-                                    : 'bg-[#0b1326] border-[#222a3d] text-[#94a3b8] hover:border-[#3b4760]'
-                                }`}
-                              >
-                                <span className="truncate">{sup.nombre}</span>
-                                <span className="text-[9px] opacity-75 shrink-0 ml-1">{sup.frente}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
                       </div>
-                    )}
-
-                    {/* Action Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRole(r.id);
-                        setIsRoleModalOpen(false);
-                      }}
-                      className={`w-full mt-2 py-2.5 px-3 rounded-xl font-['Chivo'] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
-                        isSelected
-                          ? 'bg-[#f59e0b] text-[#2a1700] hover:bg-[#ffb95f] shadow-md shadow-[#f59e0b]/20'
-                          : 'bg-[#1e293b] text-[#dae2fd] hover:bg-[#f59e0b] hover:text-[#2a1700]'
-                      }`}
-                    >
-                      <span>{isSelected ? 'ROL YA ACTIVO (INGRESAR)' : r.actionText}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                      <p className="text-xs text-[#94a3b8] mt-1 leading-normal">
+                        {r.desc}
+                      </p>
+                      <div className="mt-2 flex items-center gap-1 text-[10px] font-mono text-[#64748b]">
+                        <span className="text-[#f59e0b] font-semibold">Vistas:</span> {r.tabs}
+                      </div>
+                    </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRole(r.id);
+                      setIsRoleModalOpen(false);
+                    }}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg font-['Chivo'] font-bold text-xs uppercase tracking-wider transition-all ${
+                      isSelected
+                        ? 'bg-[#f59e0b] text-[#2a1700]'
+                        : 'bg-[#1e293b] text-[#dae2fd] hover:bg-[#f59e0b] hover:text-[#2a1700]'
+                    }`}
+                  >
+                    {isSelected ? 'Seleccionado' : 'Elegir'}
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* If Supervisor/Capataz selected, show quick user selector */}
+                {isSelected && r.id === 'Supervisor/Capataz' && (
+                  <div className="mt-3 pt-3 border-t border-[#222a3d]/80 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-[10px] text-[#ffb95f] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5" /> Identidad del Supervisor en Obra:
+                      </span>
+                      <span className="text-[10px] text-[#94a3b8] font-mono">
+                        Afecta &quot;Mis Pendientes&quot;
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {availableSupervisors.map((sup) => {
+                        const isSupActive = activeSupervisor.id === sup.id;
+                        return (
+                          <button
+                            key={sup.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveSupervisor(sup);
+                              setIsRoleModalOpen(false);
+                            }}
+                            className={`p-2 rounded-lg text-left border transition-all ${
+                              isSupActive
+                                ? 'border-[#f59e0b] bg-[#f59e0b]/15 text-[#dae2fd]'
+                                : 'border-[#222a3d] bg-[#070d18] text-[#94a3b8] hover:border-[#334155] hover:text-[#dae2fd]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-['Chivo'] font-bold text-xs text-[#dae2fd]">
+                                {sup.nombre}
+                              </span>
+                              {isSupActive && <Check className="w-3.5 h-3.5 text-[#f59e0b]" />}
+                            </div>
+                            <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">
+                              {sup.rol}
+                            </div>
+                            <div className="text-[9px] text-[#64748b] font-mono truncate">
+                              {sup.frenteAsignado}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-5 py-3 bg-[#060e20] border-t border-[#222a3d] flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] font-mono text-[#64748b]">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#10b981]" />
-            CONEXIÓN SEGURA · PROTOCOLO DE AUDITORÍA QAWAQ-SSOMA ACTIVO
-          </span>
-          <span>AUTENTICACIÓN LOCAL DEMO · SIN BACKEND EXTERNO</span>
+        {/* Footer */}
+        <div className="mt-5 pt-4 border-t border-[#222a3d] flex items-center justify-between">
+          <div className="text-[10px] font-mono text-[#64748b]">
+            Persistido en <span className="text-[#dae2fd]">localStorage</span> · Se puede cambiar en cualquier momento
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRoleModalOpen(false)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#f59e0b] text-[#2a1700] font-['Chivo'] font-black text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-md shadow-[#f59e0b]/20"
+          >
+            <span>Continuar con {currentRole}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>

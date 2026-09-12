@@ -18,9 +18,9 @@ export type CaseStatus =
   | 'Cerrado'
   | 'Rechazado';
 
-export type UserRole = 'SSOMA' | 'Supervisor/Capataz' | 'Gerencia';
+export type UserRole = 'SSOMA' | 'Supervisor/Capataz';
 
-export type DetectedBy = 'Cámara IA' | 'Reporte Manual' | string;
+export type DetectedBy = 'Cámara IA' | 'Reporte Manual';
 
 export interface SupervisorProfile {
   id: string;
@@ -33,7 +33,7 @@ export interface CaseHistoryEntry {
   accion: string;
   por: string;
   rol: string;
-  fecha: number; // timestamp Date.now()
+  fecha: number; // timestamp
   comentario?: string;
 }
 
@@ -70,14 +70,14 @@ export interface CaseItem {
   frente: string;
   urgencia: UrgencyLevel;
   prioridad: PriorityLevel;
-  plazoObjetivo: number; // timestamp SLA calculado (Crítico=+30min, Alto=+2h, Medio=+24h)
+  plazoObjetivo: number; // timestamp SLA
   estado: CaseStatus;
   asignadoA: AssignedPerson | null;
   detectadoPor: DetectedBy;
   responsable: string;
   fotoUrl: string;
   fechaCreacion: number; // timestamp
-  tiempoAbierto?: string;
+  tiempoAbierto?: string; // e.g. "8 min"
   descripcion: string;
   coordenadas?: GpsCoordinates;
   confianzaIA?: number;
@@ -91,7 +91,6 @@ export interface CaseItem {
   conformeG050?: boolean;
   conformeDS011?: boolean;
   fechaCierre?: number;
-  offlinePending?: boolean;
 }
 
 export type TabType =
@@ -140,3 +139,4 @@ export interface UsageStats {
   ultimaActividad: number;
   eventosRecientes: UserInteractionEvent[];
 }
+

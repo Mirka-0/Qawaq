@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { UsageStats, UserInteractionEvent } from '../types';
 
-const STATS_STORAGE_KEY = 'qawaq_usage_stats_v2';
+const STATS_STORAGE_KEY = 'qawaq_usage_stats_v1';
 
 const INITIAL_STATS: UsageStats = {
   alertasAtendidas: 18,
@@ -32,7 +32,7 @@ const INITIAL_STATS: UsageStats = {
     {
       id: 'EVT-4',
       tipo: 'reporte',
-      descripcion: 'Reporte manual generado en Frente B (Losa Piso 14)',
+      descripcion: 'Reporte manual generado en Frente B (Piso 14)',
       timestamp: Date.now() - 1000 * 60 * 150,
     },
   ],
@@ -51,6 +51,7 @@ export const useUsageStats = () => {
     return INITIAL_STATS;
   });
 
+  // Sync to localStorage whenever stats changes
   useEffect(() => {
     try {
       localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));

@@ -9,6 +9,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  ShieldAlert,
+  Sun,
   CheckCircle2,
 } from 'lucide-react';
 import { useUsageStats } from '../hooks/useUsageStats';
@@ -40,6 +42,7 @@ export const UsageStatsCard: React.FC = () => {
 
   return (
     <section className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-4 sm:p-5 shadow-lg transition-all duration-200">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-[#222a3d]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-[#f59e0b]/15 text-[#f59e0b] flex items-center justify-center border border-[#f59e0b]/30">
@@ -71,7 +74,7 @@ export const UsageStatsCard: React.FC = () => {
           </button>
           <button
             onClick={resetStats}
-            title="Reiniciar métricas de prueba"
+            title="Reiniciar métricas de prueba a valores iniciales"
             className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f59e0b] hover:bg-[#1e293b] border border-transparent hover:border-[#334155] transition-all active:scale-95"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -79,7 +82,9 @@ export const UsageStatsCard: React.FC = () => {
         </div>
       </div>
 
+      {/* Grid of Key Performance Counters */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+        {/* Metric 1: Alertas Cámaras */}
         <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b] flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#94a3b8]">
             <span className="font-mono text-[9px] uppercase tracking-wider font-semibold">Alertas Cámara</span>
@@ -95,6 +100,7 @@ export const UsageStatsCard: React.FC = () => {
           </div>
         </div>
 
+        {/* Metric 2: Reportes Manuales */}
         <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b] flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#94a3b8]">
             <span className="font-mono text-[9px] uppercase tracking-wider font-semibold">Reportes Emitidos</span>
@@ -110,6 +116,7 @@ export const UsageStatsCard: React.FC = () => {
           </div>
         </div>
 
+        {/* Metric 3: Casos Subsanados */}
         <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b] flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#94a3b8]">
             <span className="font-mono text-[9px] uppercase tracking-wider font-semibold">Casos Cerrados</span>
@@ -125,6 +132,7 @@ export const UsageStatsCard: React.FC = () => {
           </div>
         </div>
 
+        {/* Metric 4: Actas PDF */}
         <div className="bg-[#0b1326] p-3 rounded-xl border border-[#1e293b] flex flex-col justify-between">
           <div className="flex items-center justify-between text-[#94a3b8]">
             <span className="font-mono text-[9px] uppercase tracking-wider font-semibold">Actas PDF</span>
@@ -141,6 +149,7 @@ export const UsageStatsCard: React.FC = () => {
         </div>
       </div>
 
+      {/* Operational Velocity & Last Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#060e20] p-3 rounded-xl border border-[#1e293b] text-xs">
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-[#94a3b8]" />
@@ -161,6 +170,7 @@ export const UsageStatsCard: React.FC = () => {
         </button>
       </div>
 
+      {/* Collapsible Action Event Log */}
       {showEvents && (
         <div className="mt-3 pt-3 border-t border-[#1e293b] flex flex-col gap-1.5 animate-fadeIn">
           <span className="font-mono text-[9px] text-[#94a3b8] uppercase tracking-wider font-semibold">

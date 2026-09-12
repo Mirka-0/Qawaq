@@ -1,5 +1,5 @@
 // Service Worker for Qawaq Push Notifications
-const CACHE_NAME = 'qawaq-v2';
+const CACHE_NAME = 'qawaq-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -9,6 +9,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Handle incoming Web Push events
 self.addEventListener('push', (event) => {
   let data = {
     title: 'Qawaq // Alerta de Seguridad',
@@ -44,13 +45,16 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
+// Handle notification click: focus or open app and dispatch navigation
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
   const clickData = event.notification.data || {};
   const targetUrl = clickData.url || '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a window is already open, focus it and post a message
       for (const client of clientList) {
         if ('focus' in client) {
           client.postMessage({
@@ -60,6 +64,7 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
+      // Otherwise open a new window
       if (self.clients.openWindow) {
         return self.clients.openWindow(targetUrl);
       }
@@ -67,6 +72,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// Listen for messages from the client (e.g. for background notifications or scheduled alerts)
 self.addEventListener('message', (event) => {
   const { type, payload } = event.data || {};
 
@@ -81,7 +87,10 @@ self.addEventListener('message', (event) => {
       requireInteraction: payload.requireInteraction ?? false,
       actions: payload.actions || [],
     };
-    event.waitUntil(self.registration.showNotification(payload.title, options));
+
+    event.waitUntil(
+      self.registration.showNotification(payload.title, options)
+    );
   }
 
   if (type === 'SCHEDULE_BACKGROUND_NOTIFICATION') {

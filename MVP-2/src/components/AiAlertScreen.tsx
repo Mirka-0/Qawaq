@@ -10,42 +10,49 @@ import {
   Eye,
   SlidersHorizontal,
   CheckCircle,
+  Battery,
+  BatteryCharging,
+  BatteryLow,
+  BatteryWarning,
+  Zap,
+  ZapOff,
   Pause,
   Play,
-  UserCheck,
-  Clock,
-  HardHat,
+  Gauge,
+  Sparkles,
 } from 'lucide-react';
-import { DETECTION_SCENARIOS, SUPERVISOR_LIST } from '../constants';
+import { DETECTION_SCENARIOS } from '../constants';
 import { useCases } from '../context/CaseContext';
 import { useUsageStats } from '../hooks/useUsageStats';
-import { PriorityLevel } from '../types';
+import { usePowerSaverContext } from '../context/PowerSaverContext';
 
 export const AiAlertScreen: React.FC = () => {
-  const { addCase, showToast, setActiveTab, cases, triggerRealtimeCriticalAlert } = useCases();
+  const { addCase, showToast, setActiveTab, cases } = useCases();
   const { logInteraction } = useUsageStats();
+  const {
+    isPowerSaver,
+    batteryLevel,
+    isCharging,
+    pollingIntervalSeconds,
+    isAutoTriggered,
+    togglePowerSaver,
+    simulateLowBattery,
+  } = usePowerSaverContext();
 
   const [currentScenarioIndex, setCurrentScenarioIndex] = useState<number>(0);
   const [hudEnabled, setHudEnabled] = useState<boolean>(true);
   const [alertSent, setAlertSent] = useState<boolean>(false);
   const [isAutoPolling, setIsAutoPolling] = useState<boolean>(true);
-  const pollingIntervalSeconds = 8;
   const [countdown, setCountdown] = useState<number>(pollingIntervalSeconds);
 
-  // Priority & Assignee selectors for creating the case from AI
   const scenario = DETECTION_SCENARIOS[currentScenarioIndex];
-  const [selectedPriority, setSelectedPriority] = useState<PriorityLevel>(scenario.prioridad);
-  const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>(SUPERVISOR_LIST[0].id);
 
-  // Keep priority in sync when cycling scenarios
-  useEffect(() => {
-    setSelectedPriority(scenario.prioridad);
-  }, [scenario.code, scenario.prioridad]);
-
+  // Sync countdown when power saver interval changes
   useEffect(() => {
     setCountdown(pollingIntervalSeconds);
   }, [pollingIntervalSeconds]);
 
+  // Automated detection polling loop throttled by battery/power saver mode
   useEffect(() => {
     if (!isAutoPolling) return;
 
@@ -63,28 +70,24 @@ export const AiAlertScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [isAutoPolling, pollingIntervalSeconds]);
 
+  // Cycle scenarios manually
   const handleCycleScenario = () => {
     setAlertSent(false);
     setCurrentScenarioIndex((prev) => (prev + 1) % DETECTION_SCENARIOS.length);
     setCountdown(pollingIntervalSeconds);
   };
 
-  const handleCreateCaseFromAi = () => {
-    const isUnassigned = selectedSupervisorId === 'unassigned';
-    const chosenSup = isUnassigned
-      ? null
-      : SUPERVISOR_LIST.find((s) => s.id === selectedSupervisorId) || null;
-
+  // Notificar al Responsable
+  const handleNotifySupervisor = () => {
     const newCase = addCase({
       id: scenario.code,
       tipo: scenario.tipo,
       ubicacion: scenario.ubicacion,
       frente: scenario.frente,
       urgencia: scenario.urgencia,
-      prioridad: selectedPriority,
-      asignadoA: chosenSup ? { nombre: chosenSup.nombre, rol: chosenSup.rol } : null,
-      detectadoPor: 'Cámara IA',
-      responsable: chosenSup ? chosenSup.nombre : 'Sin Asignar (Pendiente SSOMA)',
+      estado: 'Abierto',
+      detectadoPor: 'Cámara en Obra',
+      responsable: 'Ing. Carlos Mendoza',
       fotoUrl: scenario.fotoUrl,
       descripcion: scenario.descripcion,
       confianzaIA: scenario.confianza,
@@ -102,69 +105,111 @@ export const AiAlertScreen: React.FC = () => {
     setAlertSent(true);
     logInteraction(
       'alerta',
-      `Alerta de riesgo #${newCase.id} procesada: ${scenario.tipo} (${newCase.estado})`
+      `Alerta de riesgo #${newCase.id} procesada: ${scenario.tipo} (${scenario.confianza}% confianza)`
     );
-    showToast(
-      isUnassigned
-        ? `Caso #${newCase.id} creado como "Abierto" (requiere asignación)`
-        : `Caso #${newCase.id} asignado a ${chosenSup?.nombre} (${selectedPriority})`
-    );
+    showToast(`Alerta enviada a Ing. Carlos Mendoza (Caso #${newCase.id})`);
   };
 
-  const isAlreadyOpen = cases.some((c) => c.id === scenario.code && c.estado !== 'Cerrado');
+  // Check if current scenario code is currently open in cases
+  const isAlreadyOpen = cases.some((c) => c.id === scenario.code && c.estado === 'Abierto');
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-4 max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto animate-fade-in">
-      {/* CCTV STREAM & AUTO-SCAN CONTROLLER */}
-      <section className="p-3 rounded-2xl border border-[#222a3d] bg-[#131b2e] text-[#dae2fd] shadow-md">
+    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-4 max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto">
+      {/* POWER SAVER / BATERÍA TELEMETRY & POLLING CONTROL BANNER */}
+      <section
+        className={`p-3 rounded-2xl border transition-all shadow-md ${
+          isPowerSaver
+            ? 'bg-[#1a1708] border-[#f59e0b]/50 text-[#ffddb8]'
+            : 'bg-[#131b2e] border-[#222a3d] text-[#dae2fd]'
+        }`}
+      >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/40 flex items-center justify-center font-bold">
-              <Cpu className="w-4 h-4" />
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                isPowerSaver
+                  ? 'bg-[#f59e0b] text-[#2a1700] animate-pulse'
+                  : 'bg-[#1e293b] text-[#34d399]'
+              }`}
+            >
+              {isCharging ? (
+                <BatteryCharging className="w-4 h-4" />
+              ) : isPowerSaver ? (
+                <ZapOff className="w-4 h-4" />
+              ) : (
+                <Battery className="w-4 h-4" />
+              )}
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-['Chivo'] font-bold text-xs uppercase tracking-wide text-white">
-                  Red Neuronal Vision-Safety (CCTV)
+                <span className="font-['Chivo'] font-bold text-xs uppercase tracking-wide">
+                  {isPowerSaver ? 'Modo Ahorro de Energía Activo' : 'Rendimiento Estándar'}
                 </span>
-                <span className="font-mono text-[9px] px-1.5 py-0.2 rounded font-bold uppercase bg-[#10b981]/20 text-[#34d399] border border-[#10b981]/40">
-                  Activo · 24 FPS
+                <span
+                  className={`font-mono text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                    isPowerSaver
+                      ? 'bg-[#f59e0b]/20 text-[#ffb95f] border border-[#f59e0b]/40'
+                      : 'bg-[#10b981]/20 text-[#34d399] border border-[#10b981]/40'
+                  }`}
+                >
+                  {isPowerSaver ? 'Polling 28s' : 'Polling 8s'}
                 </span>
               </div>
               <p className="font-mono text-[9px] text-[#94a3b8] mt-0.5">
-                Escaneo y detección perimétrica de condiciones subestándar y EPP en frentes activos.
+                {isPowerSaver
+                  ? 'Frecuencia de detección reducida para garantizar batería durante todo el turno.'
+                  : 'Monitoreo activo de cámaras con análisis en alta frecuencia.'}
               </p>
             </div>
           </div>
 
+          {/* Battery level & toggle controls */}
           <div className="flex items-center gap-2 ml-auto">
+            {batteryLevel !== null && (
+              <div className="flex items-center gap-1 font-mono text-[10px] px-2 py-1 rounded-lg bg-[#0b1326] border border-[#1e293b]">
+                <span className={batteryLevel <= 20 ? 'text-[#ef4444] font-bold' : 'text-[#34d399]'}>
+                  {batteryLevel}%
+                </span>
+                {isCharging && <span className="text-[#f59e0b]">⚡</span>}
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={() => setIsAutoPolling(!isAutoPolling)}
-              className={`px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase font-bold border transition-all active:scale-95 flex items-center gap-1 ${
-                isAutoPolling
-                  ? 'bg-[#1e293b] hover:bg-[#283548] text-[#dae2fd] border-[#334155]'
-                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              onClick={togglePowerSaver}
+              className={`px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase font-bold border transition-all active:scale-95 ${
+                isPowerSaver
+                  ? 'bg-[#f59e0b] text-[#2a1700] border-[#ffddb8] shadow-sm'
+                  : 'bg-[#1e293b] hover:bg-[#283548] text-[#94a3b8] hover:text-[#dae2fd] border-[#334155]'
               }`}
             >
-              {isAutoPolling ? (
-                <>
-                  <Pause className="w-3 h-3 text-amber-400" />
-                  <span>Auto-Ciclo: ON</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3 text-emerald-400" />
-                  <span>Auto-Ciclo: Pausado</span>
-                </>
-              )}
+              {isPowerSaver ? 'Ahorro: ON' : 'Ahorro: OFF'}
+            </button>
+
+            {/* Test button to simulate low battery */}
+            <button
+              type="button"
+              onClick={simulateLowBattery}
+              className="px-2 py-1 rounded-lg bg-[#0b1326] hover:bg-[#1a2337] border border-[#1e293b] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[8px] uppercase transition-colors"
+              title="Simular batería baja (14%) para comprobar cambio automático de polling"
+            >
+              Simular 14%
             </button>
           </div>
         </div>
 
+        {/* Polling countdown progress bar */}
         <div className="mt-2.5 flex items-center justify-between gap-3 text-[9px] font-mono text-[#94a3b8]">
           <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => setIsAutoPolling(!isAutoPolling)}
+              className="p-1 rounded hover:bg-[#1e293b] text-[#94a3b8] hover:text-[#dae2fd] transition-colors"
+              title={isAutoPolling ? 'Pausar ciclo de cámaras' : 'Reanudar ciclo de cámaras'}
+            >
+              {isAutoPolling ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 text-[#10b981]" />}
+            </button>
             <span className="truncate">
               Próximo escaneo en: <strong className="text-[#f59e0b] font-bold">{countdown}s</strong>
             </span>
@@ -172,7 +217,9 @@ export const AiAlertScreen: React.FC = () => {
 
           <div className="flex-1 max-w-[140px] h-1.5 bg-[#0b1326] rounded-full overflow-hidden border border-[#1e293b]">
             <div
-              className="h-full bg-[#f59e0b] transition-all duration-1000 ease-linear"
+              className={`h-full transition-all duration-1000 ease-linear ${
+                isPowerSaver ? 'bg-[#f59e0b]' : 'bg-[#10b981]'
+              }`}
               style={{
                 width: `${((pollingIntervalSeconds - countdown) / pollingIntervalSeconds) * 100}%`,
               }}
@@ -181,7 +228,7 @@ export const AiAlertScreen: React.FC = () => {
         </div>
       </section>
 
-      {/* Camera Status Bar */}
+      {/* Top camera status bar */}
       <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[#131b2e] border border-[#222a3d] shadow-sm">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-[#222a3d] flex items-center justify-center text-[#ffb95f] shrink-0">
@@ -190,7 +237,7 @@ export const AiAlertScreen: React.FC = () => {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-['Chivo'] font-bold text-xs text-[#dae2fd] truncate">
-                {scenario.camara.split('·')[0].split('//')[0].trim()}
+                {scenario.camara.split('//')[0].trim()}
               </span>
               <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-[#93000a] text-[#ffdad6] font-bold">
                 #{scenario.code}
@@ -204,54 +251,25 @@ export const AiAlertScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#93000a]/30 text-[#ffb4ab] shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] animate-pulse" />
           <span className="font-mono text-[9px] font-bold tracking-wider">EN VIVO</span>
         </div>
       </div>
 
-      {/* 5 CCTV CAMERAS SELECTOR GRID */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[#94a3b8] font-mono text-[10px]">
-          <span className="flex items-center gap-1.5 font-bold uppercase text-[#dae2fd]">
-            <Video className="w-3.5 h-3.5 text-[#f59e0b]" /> 5 Canales CCTV de Campo
+      {/* Critical Alert Warning Bar */}
+      <div className="p-2.5 rounded-xl bg-[#450a0a]/70 border border-[#ef4444]/40 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2 min-w-0">
+          <AlertTriangle className="w-4 h-4 text-[#ef4444] shrink-0 animate-bounce" />
+          <span className="font-mono text-[10px] text-[#fee2e2] font-bold uppercase tracking-tight truncate">
+            ALERTA DE RIESGO: {scenario.titulo.split(':')[1]?.trim() || scenario.tipo}
           </span>
-          <span>Click para inspeccionar cámara</span>
         </div>
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-          {DETECTION_SCENARIOS.map((scen, idx) => (
-            <button
-              key={scen.id}
-              type="button"
-              onClick={() => {
-                setCurrentScenarioIndex(idx);
-                setAlertSent(false);
-                setCountdown(pollingIntervalSeconds);
-              }}
-              className={`relative aspect-video rounded-xl overflow-hidden border transition-all ${
-                currentScenarioIndex === idx
-                  ? 'border-[#f59e0b] ring-2 ring-[#f59e0b]/50 shadow-md shadow-[#f59e0b]/20 scale-[1.02]'
-                  : 'border-[#1e293b] opacity-60 hover:opacity-100 hover:border-[#334155]'
-              }`}
-            >
-              <img
-                src={scen.fotoUrl}
-                alt={scen.camara}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-1">
-                <span className="font-mono text-[8px] font-black text-white truncate">
-                  CAM 0{idx + 1}
-                </span>
-              </div>
-              {currentScenarioIndex === idx && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#ef4444]" />
-              )}
-            </button>
-          ))}
-        </div>
+        <span className="px-2 py-0.5 rounded bg-[#ef4444] text-white font-mono text-[9px] font-extrabold uppercase tracking-wider shrink-0">
+          {scenario.urgencia === 'Alto' ? 'CRÍTICO' : 'RIESGO'}
+        </span>
       </div>
 
-      {/* CCTV Viewfinder with Computer Vision HUD */}
+      {/* CCTV Viewfinder with Computer Vision HUD & Bounding Boxes */}
       <div className="relative w-full rounded-2xl overflow-hidden bg-[#060e20] border border-[#222a3d] shadow-2xl group">
         <img
           src={scenario.fotoUrl}
@@ -260,15 +278,17 @@ export const AiAlertScreen: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#060e20]/90 via-transparent to-[#060e20]/40 pointer-events-none" />
 
+        {/* Top HUD telemetry */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 pointer-events-none">
           <span className="px-2 py-0.5 rounded bg-[#060e20]/80 backdrop-blur-md font-mono text-[9px] text-[#dae2fd]">
-            1080p · 24 FPS
+            1080p · {isPowerSaver ? '12 FPS (Bajo consumo)' : '24 FPS'}
           </span>
           <span className="px-2 py-0.5 rounded bg-[#060e20]/80 backdrop-blur-md font-mono text-[9px] text-[#10b981] flex items-center gap-1">
             <Cpu className="w-2.5 h-2.5" /> VISION-SAFETY
           </span>
         </div>
 
+        {/* Toggle HUD Button */}
         <div className="absolute top-2.5 right-2.5">
           <button
             onClick={() => setHudEnabled(!hudEnabled)}
@@ -279,6 +299,7 @@ export const AiAlertScreen: React.FC = () => {
           </button>
         </div>
 
+        {/* Main Detected Bounding Box */}
         {hudEnabled && (
           <div
             className="absolute transition-all duration-500 ease-out cursor-pointer"
@@ -289,7 +310,16 @@ export const AiAlertScreen: React.FC = () => {
               height: scenario.box.height,
             }}
           >
-            <div className="absolute inset-0 rounded border-2 border-[#ef4444] bg-[#ef4444]/15 shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
+            {/* Glowing border box */}
+            <div className="absolute inset-0 rounded border-2 border-[#ef4444] bg-[#ef4444]/15 shadow-[0_0_20px_rgba(239,68,68,0.8)] animate-pulse" />
+
+            {/* Corner brackets */}
+            <div className="absolute -top-1 -left-1 w-2 h-2 bg-[#ef4444]" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-[#ef4444]" />
+            <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-[#ef4444]" />
+            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-[#ef4444]" />
+
+            {/* Tag label above box */}
             <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#ef4444] text-white px-2 py-0.5 rounded shadow-lg flex items-center gap-1 font-mono text-[9px] font-bold uppercase tracking-tight">
               <AlertTriangle className="w-2.5 h-2.5" />
               <span>{scenario.box.label.replace('IA', '').replace('AI', '')}</span>
@@ -297,17 +327,38 @@ export const AiAlertScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Other workers with EPP verified (Compliant detections) */}
+        {hudEnabled && (
+          <>
+            <div className="absolute top-[46%] left-[23%] w-[12%] h-[22%] pointer-events-none opacity-85">
+              <div className="absolute inset-0 rounded border border-[#10b981]/70 bg-[#10b981]/10" />
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#060e20]/90 text-[#34d399] px-1.5 py-0.2 rounded font-mono text-[8px] font-semibold">
+                EPP OK · 99.1%
+              </div>
+            </div>
+            <div className="absolute top-[45%] left-[59%] w-[11%] h-[23%] pointer-events-none opacity-85">
+              <div className="absolute inset-0 rounded border border-[#10b981]/70 bg-[#10b981]/10" />
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#060e20]/90 text-[#34d399] px-1.5 py-0.2 rounded font-mono text-[8px] font-semibold">
+                EPP OK · 97.8%
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Bottom CCTV telemetrics */}
         <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-[#94a3b8] font-mono text-[9px]">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
-            <span>ESCANEANDO CUADRILLA ACTIVA</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-ping" />
+            <span>MONITOREO: 8 OPERARIOS EN ZONA</span>
           </div>
           <span className="text-[#dae2fd]">CERTEZA {scenario.confianza}%</span>
         </div>
       </div>
 
-      {/* Detail & Assignment Controls for New Incident */}
-      <div className="rounded-2xl bg-[#131b2e] p-4 border border-[#222a3d] shadow-xl space-y-3">
+      {/* Incident Detail Card */}
+      <div className="rounded-2xl bg-[#131b2e] p-4 border border-[#222a3d] shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#ef4444]" />
+
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-1.5">
@@ -316,94 +367,49 @@ export const AiAlertScreen: React.FC = () => {
                 {scenario.urgencia === 'Alto' ? 'RIESGO ALTO / PARADA' : 'RIESGO MODERADO'}
               </span>
             </div>
-            <h2 className="font-['Chivo'] font-bold text-sm text-[#dae2fd] mt-1 leading-snug">
+            <h2 className="font-['Chivo'] font-bold text-sm text-[#dae2fd] mt-1.5 leading-snug">
               {scenario.titulo}
             </h2>
           </div>
-          <span className="font-mono text-[10px] text-[#94a3b8] shrink-0">En vivo</span>
+          <span className="font-mono text-[10px] text-[#94a3b8] shrink-0">Hace 30s</span>
         </div>
 
-        <p className="font-sans text-xs text-[#94a3b8] leading-relaxed">
+        <p className="font-sans text-xs text-[#94a3b8] mt-2 leading-relaxed">
           {scenario.descripcion}
         </p>
 
-        {/* Dynamic Priority & SLA Selector */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#1e293b]">
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-[#94a3b8] mb-1 font-bold flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#f59e0b]" />
-              Prioridad & Plazo SLA:
-            </label>
-            <div className="grid grid-cols-3 gap-1">
-              {(['Crítico', 'Alto', 'Medio'] as PriorityLevel[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setSelectedPriority(p)}
-                  className={`py-1.5 px-1 rounded-lg font-mono text-[10px] uppercase font-bold border transition-all ${
-                    selectedPriority === p
-                      ? p === 'Crítico'
-                        ? 'bg-red-500 text-white border-red-300 shadow-md'
-                        : p === 'Alto'
-                        ? 'bg-[#f59e0b] text-[#2a1700] border-[#ffddb8] shadow-md'
-                        : 'bg-cyan-500 text-[#022c22] border-cyan-300 shadow-md'
-                      : 'bg-[#0b1326] text-[#94a3b8] border-[#1e293b] hover:text-[#dae2fd]'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+        {/* Telemetry metadata block */}
+        <div className="mt-3 grid grid-cols-2 gap-2 p-2 rounded-xl bg-[#0b1326] border border-[#1e293b]">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#f59e0b] shrink-0" />
+            <div className="min-w-0">
+              <span className="font-mono text-[8px] text-[#94a3b8] uppercase block">
+                Ubicación GPS
+              </span>
+              <span className="font-mono text-[10px] text-[#dae2fd] font-semibold truncate block">
+                {scenario.ubicacion}
+              </span>
             </div>
-            <span className="text-[9px] font-mono text-[#64748b] block mt-1">
-              {selectedPriority === 'Crítico'
-                ? 'Objetivo Inmediato · SLA 30 min'
-                : selectedPriority === 'Alto'
-                ? 'Objetivo Urgente · SLA 2 horas'
-                : 'Objetivo Estándar · SLA 24 horas'}
-            </span>
           </div>
-
-          {/* Supervisor / Capataz to assign */}
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-[#94a3b8] mb-1 font-bold flex items-center gap-1">
-              <HardHat className="w-3 h-3 text-[#10b981]" />
-              Asignar Responsable en Campo:
-            </label>
-            <select
-              value={selectedSupervisorId}
-              onChange={(e) => setSelectedSupervisorId(e.target.value)}
-              className="w-full bg-[#0b1326] border border-[#1e293b] rounded-xl px-2.5 py-1.5 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none"
-            >
-              <option value="unassigned">Sin Asignar (Dejar Abierto para SSOMA)</option>
-              {SUPERVISOR_LIST.map((sup) => (
-                <option key={sup.id} value={sup.id}>
-                  {sup.nombre} ({sup.rol})
-                </option>
-              ))}
-            </select>
-            <span className="text-[9px] font-mono text-[#64748b] block mt-1">
-              {selectedSupervisorId === 'unassigned'
-                ? 'Nacerá en estado "Abierto"'
-                : 'Nacerá directo en estado "Asignado"'}
-            </span>
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-[#10b981] shrink-0" />
+            <div className="min-w-0">
+              <span className="font-mono text-[8px] text-[#94a3b8] uppercase block">
+                Certeza Algorítmica
+              </span>
+              <span className="font-mono text-[10px] text-[#10b981] font-bold truncate block">
+                {scenario.confianza}% (Alta Confiabilidad)
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Main Glove-Ready Action Buttons */}
       <div className="flex flex-col gap-2 pt-1">
-        {/* Realtime Critical Alert Simulator Button */}
+        {/* Button 1: Notificar al Responsable */}
         <button
-          type="button"
-          onClick={() => triggerRealtimeCriticalAlert(currentScenarioIndex)}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-amber-600 to-red-600 hover:from-red-500 hover:to-amber-500 text-white font-['Chivo'] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all active:scale-[0.98] border border-red-400/50"
-        >
-          <span className="w-2 h-2 rounded-full bg-white" />
-          <span>🚨 Simular Detección IA en Tiempo Real (Alerta Sonora + Push)</span>
-        </button>
-
-        <button
-          onClick={handleCreateCaseFromAi}
+          onClick={handleNotifySupervisor}
           disabled={alertSent || isAlreadyOpen}
           className={`w-full h-13 py-3.5 px-4 rounded-xl font-['Chivo'] font-black text-sm tracking-wide uppercase flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${
             alertSent || isAlreadyOpen
@@ -414,37 +420,47 @@ export const AiAlertScreen: React.FC = () => {
           {alertSent || isAlreadyOpen ? (
             <>
               <CheckCircle className="w-5 h-5 text-[#10b981]" />
-              <span>Caso #{scenario.code} en Proceso en el Dashboard</span>
+              <span>Alerta Despachada (#{scenario.code} en Dashboard)</span>
             </>
           ) : (
             <>
               <Send className="w-5 h-5" />
-              <span>
-                {selectedSupervisorId === 'unassigned'
-                  ? 'Registrar Alerta Abierta (SSOMA)'
-                  : 'Despachar Caso Asignado a Campo'}
-              </span>
+              <span>Notificar al Responsable (Ing. Carlos Mendoza)</span>
             </>
           )}
         </button>
 
+        {/* Secondary buttons */}
         <div className="grid grid-cols-2 gap-2">
+          {/* Cycle detection scenario */}
           <button
             onClick={handleCycleScenario}
             className="h-11 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#dae2fd] font-mono text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all border border-[#334155] active:scale-95"
           >
             <RefreshCw className="w-3.5 h-3.5 text-[#f59e0b]" />
-            <span className="truncate">Siguiente Cámara</span>
+            <span className="truncate">Cambiar Cámara Manual</span>
           </button>
 
+          {/* Go to Dashboard or Manual Report */}
           <button
             onClick={() => setActiveTab('dashboard')}
             className="h-11 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-[#2a1700] font-['Chivo'] font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-[#f59e0b]/20 active:scale-95"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span className="truncate">Ver Dashboard →</span>
+            <span className="truncate">Ver en Dashboard →</span>
           </button>
         </div>
+      </div>
+
+      {/* Info footer note */}
+      <div className="p-3 rounded-xl bg-[#131b2e]/60 border border-[#1e293b] flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-lg bg-[#1e293b] flex items-center justify-center shrink-0 text-[#f59e0b]">
+          <Eye className="w-4 h-4" />
+        </div>
+        <p className="font-mono text-[9px] text-[#94a3b8] leading-relaxed">
+          <strong className="text-[#f59e0b]">QAWAQ</strong> vigila los frentes activos de obra en
+          paralelo. Cada evento queda registrado con coordenadas georreferenciadas y marca de tiempo.
+        </p>
       </div>
     </div>
   );

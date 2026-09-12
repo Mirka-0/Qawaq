@@ -1,15 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { INITIAL_CASES, DETECTION_SCENARIOS } from '../constants';
-import {
-  AssignedPerson,
-  CaseHistoryEntry,
-  CaseItem,
-  CaseStatus,
-  PriorityLevel,
-  TabType,
-} from '../types';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { INITIAL_CASES } from '../constants';
+import { AssignedPerson, CaseHistoryEntry, CaseItem, CaseStatus, PriorityLevel, TabType } from '../types';
 import { NotificationService } from '../services/notificationService';
-import { OfflineService } from '../services/offlineService';
 import { getTargetDeadline } from '../utils/sla';
 import { useRole } from './RoleContext';
 
@@ -21,9 +13,6 @@ interface CaseContextType {
   setSelectedCaseForClosureId: (id: string | null) => void;
   selectedCaseForDetailId: string | null;
   setSelectedCaseForDetailId: (id: string | null) => void;
-  activePushAlert: { caseItem: CaseItem; timestamp: number } | null;
-  dismissPushAlert: () => void;
-  triggerRealtimeCriticalAlert: (scenarioIndex?: number) => CaseItem;
   addCase: (
     newCase: Omit<CaseItem, 'id' | 'fechaCreacion' | 'historial' | 'plazoObjetivo' | 'estado'> & {
       id?: string;
@@ -31,7 +20,6 @@ interface CaseContextType {
       plazoObjetivo?: number;
       asignadoA?: AssignedPerson | null;
       estado?: CaseStatus;
-      offlinePending?: boolean;
     }
   ) => CaseItem;
   assignCase: (id: string, asignadoA: AssignedPerson, prioridad?: PriorityLevel) => void;
@@ -56,12 +44,6 @@ interface CaseContextType {
   navigateToCloseCase: (caseId: string) => void;
   isNotificationModalOpen: boolean;
   setIsNotificationModalOpen: (open: boolean) => void;
-  isTourOpen: boolean;
-  setIsTourOpen: (open: boolean) => void;
-  isOnline: boolean;
-  offlineQueueCount: number;
-  syncOfflineQueueNow: () => Promise<void>;
-  toggleSimulatedOffline: (offline: boolean) => void;
 }
 
 const STORAGE_KEY = 'qawaq_cases_v2';
@@ -69,7 +51,7 @@ const STORAGE_KEY = 'qawaq_cases_v2';
 const CaseContext = createContext<CaseContextType | undefined>(undefined);
 
 export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentRole, currentUserName, activeSupervisor, isSupervisor } = useRole();
+  const { currentRole, currentUserName } = useRole();
 
   const [cases, setCases] = useState<CaseItem[]>(() => {
     try {
@@ -94,73 +76,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedCaseForDetailId, setSelectedCaseForDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
-  const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
-  const [activePushAlert, setActivePushAlert] = useState<{ caseItem: CaseItem; timestamp: number } | null>(null);
-
-  // Offline service state
-  const [isOnline, setIsOnline] = useState<boolean>(() => OfflineService.isOnline());
-  const [offlineQueueCount, setOfflineQueueCount] = useState<number>(() => OfflineService.getQueue().length);
-
-  const dismissPushAlert = () => {
-    setActivePushAlert(null);
-  };
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => {
-      setToast((current) => (current === msg ? null : current));
-    }, 4500);
-  };
-
-  // Sync Offline Queue callback
-  const syncOfflineQueueNow = useCallback(async () => {
-    if (!OfflineService.isOnline()) {
-      showToast('⚠️ No hay conexión a internet para sincronizar.');
-      return;
-    }
-
-    const { syncedCount } = await OfflineService.syncQueue(async (reportData) => {
-      // Mark as synced in local state
-      setCases((prev) =>
-        prev.map((c) => {
-          if (c.id === reportData.id || c.offlinePending) {
-            return { ...c, offlinePending: false };
-          }
-          return c;
-        })
-      );
-      return true;
-    });
-
-    if (syncedCount > 0) {
-      NotificationService.playSafetyTone('chime');
-      showToast(`🟢 Conexión activa: ${syncedCount} reporte(s) offline sincronizados con el servidor.`);
-    }
-  }, []);
-
-  // Listen to offline service changes and auto-sync when online
-  useEffect(() => {
-    const unsubscribe = OfflineService.subscribe((online, count) => {
-      setIsOnline(online);
-      setOfflineQueueCount(count);
-
-      if (online && count > 0) {
-        syncOfflineQueueNow();
-      }
-    });
-
-    return () => unsubscribe();
-  }, [syncOfflineQueueNow]);
-
-  const toggleSimulatedOffline = (offline: boolean) => {
-    OfflineService.setSimulatedOffline(offline);
-    if (offline) {
-      showToast('📡 Modo Sin Conexión (Offline) activado para simulación de campo.');
-    } else {
-      showToast('🌐 Modo Conectado (Online) restablecido.');
-      syncOfflineQueueNow();
-    }
-  };
 
   // Sync tab when role changes if current tab is invalid for the new role
   useEffect(() => {
@@ -217,6 +132,13 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cases]);
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => {
+      setToast((current) => (current === msg ? null : current));
+    }, 4000);
+  };
+
   const addCase = (
     newCaseData: Omit<CaseItem, 'id' | 'fechaCreacion' | 'historial' | 'plazoObjetivo' | 'estado'> & {
       id?: string;
@@ -224,7 +146,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       plazoObjetivo?: number;
       asignadoA?: AssignedPerson | null;
       estado?: CaseStatus;
-      offlinePending?: boolean;
     }
   ): CaseItem => {
     const existingIds = cases.map((c) => {
@@ -233,9 +154,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const nextNum = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 105;
     const generatedId = newCaseData.id || `QW-${nextNum}`;
-
-    const isCurrentlyOffline = !OfflineService.isOnline();
-    const isPendingOffline = isCurrentlyOffline || Boolean(newCaseData.offlinePending);
 
     const priorityToUse: PriorityLevel =
       newCaseData.prioridad ||
@@ -250,9 +168,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         por: currentUserName,
         rol: currentRole,
         fecha: Date.now(),
-        comentario: `Detectado vía ${newCaseData.detectadoPor}. Prioridad: ${priorityToUse}.${
-          isPendingOffline ? ' (Registrado en modo Offline)' : ''
-        }`,
+        comentario: `Detectado vía ${newCaseData.detectadoPor}. Prioridad: ${priorityToUse}.`,
       },
     ];
 
@@ -262,7 +178,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         por: currentUserName,
         rol: currentRole,
         fecha: Date.now(),
-        comentario: `Responsable: ${newCaseData.asignadoA.rol}.`,
+        comentario: `Asignado a ${newCaseData.asignadoA.rol}.`,
       });
     }
 
@@ -273,70 +189,15 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       plazoObjetivo: targetDeadline,
       estado: initialStatus,
       asignadoA: newCaseData.asignadoA || null,
-      responsable: newCaseData.asignadoA?.nombre || newCaseData.responsable || 'Sin Asignar (Pendiente SSOMA)',
+      responsable: newCaseData.asignadoA?.nombre || newCaseData.responsable || 'Sin Asignar',
       fechaCreacion: Date.now(),
       tiempoAbierto: 'Ahora',
       historial: initialHistory,
-      offlinePending: isPendingOffline,
     };
-
-    if (isCurrentlyOffline) {
-      OfflineService.saveReportOffline(createdItem);
-      showToast('📡 Sin conexión: Reporte guardado en caché local. Se sincronizará automáticamente al volver en línea.');
-    }
 
     setCases((prev) => [createdItem, ...prev.filter((c) => c.id !== generatedId)]);
     NotificationService.notifyNewAiAlert(createdItem);
-
-    if (priorityToUse === 'Crítico') {
-      NotificationService.playSafetyTone('alarm');
-      setActivePushAlert({ caseItem: createdItem, timestamp: Date.now() });
-    }
-
     return createdItem;
-  };
-
-  const triggerRealtimeCriticalAlert = (scenarioIndex?: number): CaseItem => {
-    const idx =
-      scenarioIndex !== undefined
-        ? Math.abs(scenarioIndex) % DETECTION_SCENARIOS.length
-        : 2; // Default to CAM_03 (Altura sin arnés) or CAM_05 (Riesgo Eléctrico)
-    const scen = DETECTION_SCENARIOS[idx];
-
-    const isSupervisorActive = currentRole === 'Supervisor/Capataz';
-    const chosenAssignee = isSupervisorActive
-      ? { nombre: activeSupervisor.nombre, rol: activeSupervisor.rol }
-      : { nombre: 'Ing. Carlos Mendoza', rol: 'Supervisor Frente B' };
-
-    const newCase = addCase({
-      id: `QW-${Math.floor(110 + Math.random() * 80)}`,
-      tipo: scen.tipo,
-      ubicacion: scen.ubicacion,
-      frente: scen.frente,
-      urgencia: 'Alto',
-      prioridad: 'Crítico',
-      asignadoA: chosenAssignee,
-      responsable: chosenAssignee.nombre,
-      detectadoPor: 'Cámara CCTV IA (En Vivo)',
-      fotoUrl: scen.fotoUrl,
-      descripcion: scen.descripcion,
-      confianzaIA: scen.confianza,
-      camaraOrigen: scen.camara,
-      coordenadas: {
-        lat: -12.096841,
-        lng: -77.035219,
-        accuracy: 2.8,
-        altitude: 104.2,
-        timestamp: Date.now(),
-        origen: 'CALIBRADO_OBRA',
-      },
-    });
-
-    NotificationService.playSafetyTone('alarm');
-    NotificationService.notifyNewAiAlert(newCase);
-    setActivePushAlert({ caseItem: newCase, timestamp: Date.now() });
-    showToast(`🚨 Alerta Crítica en Vivo: ${scen.tipo} en ${scen.camara.split('·')[0].split('//')[0].trim()}`);
-    return newCase;
   };
 
   const assignCase = (id: string, asignadoA: AssignedPerson, newPrioridad?: PriorityLevel) => {
@@ -346,7 +207,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (item.id === id) {
           const priorityToUse = newPrioridad || item.prioridad || 'Alto';
           const newDeadline = getTargetDeadline(priorityToUse);
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: `Asignado a ${asignadoA.nombre}`,
@@ -387,14 +248,14 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCases((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: 'Corrección iniciada',
               por: currentUserName,
               rol: currentRole,
               fecha: Date.now(),
-              comentario: 'Responsable en campo inició la subsanación del riesgo.',
+              comentario: 'Responsable en campo inició la subsanación.',
             },
           ];
           const updated: CaseItem = {
@@ -416,7 +277,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCases((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: 'Evidencia subida',
@@ -454,13 +315,12 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const approveValidation = (id: string, dictamen?: string) => {
     let updatedCase: CaseItem | undefined;
-    const comment =
-      dictamen || 'Evidencia técnica conforme a normativa G.050. Subsanación validada en campo.';
+    const comment = dictamen || 'Evidencia de subsanación verificada conforme a normas de seguridad.';
     setCases((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           const diffMinutes = Math.max(1, Math.round((Date.now() - item.fechaCreacion) / 60000));
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: 'Cerrado',
@@ -507,7 +367,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCases((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: 'Rechazado',
@@ -559,7 +419,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       prev.map((item) => {
         if (item.id === id) {
           const diffMinutes = Math.max(1, Math.round((Date.now() - item.fechaCreacion) / 60000));
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(item.historial || []),
             {
               accion: 'Cerrado',
@@ -610,7 +470,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCases((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          const newHistorial: CaseHistoryEntry[] = [
+          const newHistorial = [
             ...(c.historial || []),
             {
               accion: `Estado cambiado a ${status}`,
@@ -646,7 +506,7 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
-    showToast('Datos de demostración reiniciados a valores iniciales');
+    showToast('Datos de demostración reiniciados a valores originales');
   };
 
   const navigateToCloseCase = (caseId: string) => {
@@ -664,9 +524,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSelectedCaseForClosureId,
         selectedCaseForDetailId,
         setSelectedCaseForDetailId,
-        activePushAlert,
-        dismissPushAlert,
-        triggerRealtimeCriticalAlert,
         addCase,
         assignCase,
         startCorrection,
@@ -681,12 +538,6 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigateToCloseCase,
         isNotificationModalOpen,
         setIsNotificationModalOpen,
-        isTourOpen,
-        setIsTourOpen,
-        isOnline,
-        offlineQueueCount,
-        syncOfflineQueueNow,
-        toggleSimulatedOffline,
       }}
     >
       {children}
@@ -701,3 +552,4 @@ export const useCases = () => {
   }
   return context;
 };
+

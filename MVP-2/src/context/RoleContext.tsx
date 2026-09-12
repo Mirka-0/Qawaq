@@ -11,7 +11,6 @@ interface RoleContextType {
   currentUserName: string;
   isSSOMA: boolean;
   isSupervisor: boolean;
-  isGerencia: boolean;
   isRoleModalOpen: boolean;
   setIsRoleModalOpen: (open: boolean) => void;
 }
@@ -25,7 +24,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
     try {
       const saved = localStorage.getItem(ROLE_STORAGE_KEY);
-      if (saved === 'SSOMA' || saved === 'Supervisor/Capataz' || saved === 'Gerencia') {
+      if (saved === 'SSOMA' || saved === 'Supervisor/Capataz') {
         return saved;
       }
     } catch {
@@ -70,9 +69,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const currentUserName =
     currentRole === 'SSOMA'
       ? 'Ing. Elena Rivas (SSOMA)'
-      : currentRole === 'Supervisor/Capataz'
-      ? `${activeSupervisor.nombre} (${activeSupervisor.rol})`
-      : 'Ing. Roberto Alarcón (Gerente de Obra)';
+      : `${activeSupervisor.nombre} (${activeSupervisor.rol})`;
 
   return (
     <RoleContext.Provider
@@ -85,7 +82,6 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUserName,
         isSSOMA: currentRole === 'SSOMA',
         isSupervisor: currentRole === 'Supervisor/Capataz',
-        isGerencia: currentRole === 'Gerencia',
         isRoleModalOpen,
         setIsRoleModalOpen,
       }}

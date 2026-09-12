@@ -3,11 +3,13 @@ import React from 'react';
 interface QawaqLogoProps {
   className?: string;
   size?: number;
+  showGlow?: boolean;
 }
 
 export const QawaqLogo: React.FC<QawaqLogoProps> = ({
   className = 'w-9 h-9',
   size = 40,
+  showGlow = true,
 }) => {
   return (
     <svg
@@ -18,69 +20,167 @@ export const QawaqLogo: React.FC<QawaqLogoProps> = ({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Logo Qawaq"
+      aria-label="Qawaq Logo"
     >
       <defs>
-        <linearGradient id="qawaq-bg-comp" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#151d2e" />
+        {/* Background gradient */}
+        <linearGradient id="qawaq-bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#141d2e" />
           <stop offset="50%" stopColor="#0d1424" />
           <stop offset="100%" stopColor="#080c16" />
         </linearGradient>
 
-        <linearGradient id="qawaq-orange-comp" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ffa71a" />
-          <stop offset="50%" stopColor="#f59e0b" />
+        {/* Orange glow gradient for Q tail & visor */}
+        <linearGradient id="qawaq-orange" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fbbf24" />
+          <stop offset="60%" stopColor="#f59e0b" />
           <stop offset="100%" stopColor="#ea580c" />
         </linearGradient>
 
-        <linearGradient id="qawaq-tail-comp" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fb923c" />
-          <stop offset="100%" stopColor="#ea580c" />
-        </linearGradient>
-
-        <linearGradient id="qawaq-iris-comp" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ffb940" />
+        <linearGradient id="qawaq-eye-pupil" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffc043" />
           <stop offset="50%" stopColor="#f97316" />
           <stop offset="100%" stopColor="#c2410c" />
         </linearGradient>
 
-        <linearGradient id="qawaq-slate-ring-comp" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3d4f6c" />
-          <stop offset="100%" stopColor="#2c3a50" />
+        {/* Reticle slate metallic ring */}
+        <linearGradient id="qawaq-reticle" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3d4d68" />
+          <stop offset="100%" stopColor="#253246" />
         </linearGradient>
+
+        {/* Soft amber glow filter */}
+        {showGlow && (
+          <filter id="qawaq-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="10" floodColor="#f59e0b" floodOpacity="0.45" />
+          </filter>
+        )}
+
+        <filter id="qawaq-inner-shadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.5" />
+        </filter>
       </defs>
 
-      {/* Dark navy squircle background with NO outer border */}
-      <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#qawaq-bg-comp)" />
+      {/* 1. Rounded Dark Navy Squircle Container */}
+      <rect
+        x="16"
+        y="16"
+        width="480"
+        height="480"
+        rx="115"
+        fill="url(#qawaq-bg)"
+        stroke="#27354d"
+        strokeWidth="6"
+      />
 
-      {/* Center Crosshair / Aim Reticle Guides */}
-      <g stroke="#3a4b66" strokeWidth="3.5" opacity="0.85">
-        <line x1="256" y1="108" x2="256" y2="404" strokeDasharray="6 7" />
-        <line x1="120" y1="256" x2="162" y2="256" strokeDasharray="5 5" />
-        <line x1="350" y1="256" x2="392" y2="256" strokeDasharray="5 5" />
+      {/* Inner subtle rim */}
+      <rect
+        x="24"
+        y="24"
+        width="464"
+        height="464"
+        rx="107"
+        fill="none"
+        stroke="#1a2538"
+        strokeWidth="2"
+      />
+
+      {/* 2. Crosshair Guidelines (Dashed Reticle Axis) */}
+      <g stroke="#3a4964" strokeWidth="3" strokeDasharray="8 8" opacity="0.75">
+        <line x1="256" y1="90" x2="256" y2="422" />
+        <line x1="90" y1="256" x2="422" y2="256" />
       </g>
 
-      {/* Outer Slate Circle */}
-      <circle cx="256" cy="256" r="142" stroke="url(#qawaq-slate-ring-comp)" strokeWidth="36" fill="none" />
+      {/* 3. Reticle Base Ring (Forming the circular body of the 'Q') */}
+      <circle
+        cx="256"
+        cy="256"
+        r="140"
+        stroke="url(#qawaq-reticle)"
+        strokeWidth="34"
+        fill="none"
+      />
 
-      {/* Top Vibrant Orange Radar Arc */}
-      <path d="M 152 166 A 142 142 0 0 1 356 156" fill="none" stroke="url(#qawaq-orange-comp)" strokeWidth="38" strokeLinecap="round" />
+      {/* Tick markers at cardinal points */}
+      <g stroke="#4f6385" strokeWidth="4">
+        <line x1="256" y1="84" x2="256" y2="104" />
+        <line x1="256" y1="408" x2="256" y2="428" />
+        <line x1="84" y1="256" x2="104" y2="256" />
+        <line x1="408" y1="256" x2="428" y2="256" />
+      </g>
 
-      {/* Radar Ping Green Node at right end of orange arc */}
-      <circle cx="360" cy="148" r="13" fill="#10b981" />
-      <circle cx="360" cy="148" r="21" stroke="#10b981" strokeWidth="3" fill="none" opacity="0.85" />
+      {/* 4. Orange Arched Safety Visor (Top arc of Q) */}
+      <path
+        d="M 148 168 A 140 140 0 0 1 364 168"
+        fill="none"
+        stroke="url(#qawaq-orange)"
+        strokeWidth="38"
+        strokeLinecap="round"
+        filter={showGlow ? 'url(#qawaq-glow)' : undefined}
+      />
 
-      {/* Orange Rectangular Q-Tail (NO glow) */}
-      <rect x="306" y="306" width="42" height="106" rx="12" transform="rotate(-45 306 306)" fill="url(#qawaq-tail-comp)" />
+      {/* Green Status Beacon Dot on the right side of the visor */}
+      <g transform="translate(352, 142)">
+        <circle cx="0" cy="0" r="17" fill="none" stroke="#10b981" strokeWidth="2.5" opacity="0.6" />
+        <circle cx="0" cy="0" r="11" fill="#10b981" />
+        <circle cx="-3" cy="-3" r="3" fill="#6ee7b7" />
+      </g>
 
-      {/* Center Eye Shape */}
-      <path d="M 166 256 C 196 198 316 198 346 256 C 316 314 196 314 166 256 Z" fill="#080c14" stroke="#1e293b" strokeWidth="4" strokeLinejoin="round" />
+      {/* 5. Glowing Orange Diagonal Tab (Tail of the 'Q' at 5 o'clock) */}
+      <g filter={showGlow ? 'url(#qawaq-glow)' : undefined}>
+        <rect
+          x="306"
+          y="306"
+          width="40"
+          height="108"
+          rx="12"
+          transform="rotate(-45 306 306)"
+          fill="url(#qawaq-orange)"
+        />
+      </g>
 
-      {/* Center Iris & Pupil */}
-      <circle cx="256" cy="256" r="35" fill="url(#qawaq-iris-comp)" />
-      <circle cx="256" cy="256" r="17" fill="#0a0e18" />
-      <circle cx="266" cy="246" r="8.5" fill="#ffffff" />
-      <circle cx="249" cy="264" r="3" fill="#fed7aa" opacity="0.75" />
+      {/* 6. Central Cybernetic Safety Eye */}
+      <g filter="url(#qawaq-inner-shadow)">
+        {/* Eye outer contour */}
+        <path
+          d="M 152 256 C 184 190 328 190 360 256 C 328 322 184 322 152 256 Z"
+          fill="#060b14"
+          stroke="url(#qawaq-orange)"
+          strokeWidth="11"
+          strokeLinejoin="round"
+        />
+
+        {/* Outer amber iris ring */}
+        <circle
+          cx="256"
+          cy="256"
+          r="38"
+          fill="url(#qawaq-eye-pupil)"
+        />
+
+        {/* Dark pupil center */}
+        <circle
+          cx="256"
+          cy="256"
+          r="20"
+          fill="#0a0a0c"
+        />
+
+        {/* White catchlight reflection dot */}
+        <circle
+          cx="264"
+          cy="246"
+          r="8"
+          fill="#ffffff"
+        />
+        <circle
+          cx="248"
+          cy="264"
+          r="3.5"
+          fill="#ffedd5"
+          opacity="0.8"
+        />
+      </g>
     </svg>
   );
 };

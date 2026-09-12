@@ -4,7 +4,7 @@ const STORAGE_KEY = 'qawaq_power_saver_pref';
 
 export interface UsePowerSaverReturn {
   isPowerSaver: boolean;
-  batteryLevel: number | null;
+  batteryLevel: number | null; // 0 - 100 percentage
   isCharging: boolean;
   isBatterySupported: boolean;
   pollingIntervalMs: number;
@@ -33,6 +33,7 @@ export const usePowerSaver = (): UsePowerSaverReturn => {
     return false;
   });
 
+  // Check hardware battery if supported by browser
   useEffect(() => {
     let batteryObj: any = null;
 
@@ -40,6 +41,8 @@ export const usePowerSaver = (): UsePowerSaverReturn => {
       if (batteryObj) {
         const levelPct = Math.round(batteryObj.level * 100);
         setBatteryLevel(levelPct);
+
+        // Auto-activate power saver when battery <= 20% and not plugged in
         if (levelPct <= 20 && !batteryObj.charging) {
           setIsPowerSaver(true);
           setIsAutoTriggered(true);
@@ -51,6 +54,7 @@ export const usePowerSaver = (): UsePowerSaverReturn => {
       if (batteryObj) {
         setIsCharging(batteryObj.charging);
         if (batteryObj.charging && isAutoTriggered) {
+          // If charging and was auto-triggered, we can relax power saver
           setIsPowerSaver(false);
           setIsAutoTriggered(false);
         }
@@ -77,10 +81,12 @@ export const usePowerSaver = (): UsePowerSaverReturn => {
         })
         .catch(() => {
           setIsBatterySupported(false);
+          // Set a realistic mobile shift battery default if API fails
           setBatteryLevel(68);
         });
     } else {
       setIsBatterySupported(false);
+      // Sensible mobile site battery default for simulation
       setBatteryLevel(64);
     }
 
@@ -122,6 +128,9 @@ export const usePowerSaver = (): UsePowerSaverReturn => {
     setIsAutoTriggered(true);
   }, []);
 
+  // Polling rate of simulated detections:
+  // Normal mode: 7.5 seconds (7500ms)
+  // Power Saver mode: 28 seconds (28000ms) - reduces CPU/network wakeups by ~73%
   const pollingIntervalMs = isPowerSaver ? 28000 : 7500;
   const pollingIntervalSeconds = isPowerSaver ? 28 : 8;
 

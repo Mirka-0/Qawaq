@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { GpsCoordinates } from '../types';
 
+// Default calibrated reference coordinates for Torre Andina Construction Site (San Isidro / Lima)
 const SITE_BENCHMARK_COORDINATES: GpsCoordinates = {
   lat: -12.096841,
   lng: -77.035219,
@@ -29,7 +30,7 @@ export const useGeolocation = (): UseGeolocationReturn => {
 
   const fetchPosition = useCallback(() => {
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      setError('Geolocalización no soportada. Usando coordenadas calibradas de obra.');
+      setError('Geolocalización no soportada por el navegador. Usando coordenadas calibradas del Frente de Obra.');
       setIsLoading(false);
       setIsLiveGps(false);
       setCoordinates({
@@ -60,13 +61,17 @@ export const useGeolocation = (): UseGeolocationReturn => {
       (err) => {
         if (!isMountedRef.current) return;
         console.warn('Geolocation error or permission denied:', err.message);
-        let errorMsg = 'GPS no disponible en el dispositivo. Coordenadas calibradas fijadas.';
+        let errorMsg = 'GPS no disponible en el dispositivo. Coordenadas calibradas de Torre Andina fijadas.';
         if (err.code === err.PERMISSION_DENIED) {
-          errorMsg = 'Permiso GPS no concedido. Usando punto de control de obra.';
+          errorMsg = 'Permiso GPS bloqueado. Se fijaron coordenadas calibradas de la obra.';
+        } else if (err.code === err.TIMEOUT) {
+          errorMsg = 'Tiempo de espera GPS agotado. Usando punto de control de obra.';
         }
+
         setError(errorMsg);
         setIsLiveGps(false);
         setIsLoading(false);
+        // Fallback to site benchmark coordinates with slight jitter to simulate realistic mobile fix
         setCoordinates({
           ...SITE_BENCHMARK_COORDINATES,
           timestamp: Date.now(),

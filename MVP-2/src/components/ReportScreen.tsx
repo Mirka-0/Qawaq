@@ -1,534 +1,686 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
+  Zap,
+  Timer,
   Camera,
   MapPin,
+  RefreshCw,
   Mic,
   MicOff,
-  Send,
-  Upload,
-  AlertTriangle,
-  Navigation,
-  RefreshCw,
-  Sparkles,
-  HardHat,
-  Clock,
-  UserCheck,
-  Radio,
   Volume2,
+  Trash2,
+  Sparkles,
+  Send,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  HardHat,
+  ShieldAlert,
+  Shield,
+  Upload,
+  Navigation,
+  Crosshair,
 } from 'lucide-react';
-import { SUPERVISOR_LIST, FRENTES_OBRA, TIPO_CONDICIONES, ASSETS } from '../constants';
+import { ASSETS, RISK_TYPES, WORK_FRONTS } from '../constants';
 import { useCases } from '../context/CaseContext';
-import { useRole } from '../context/RoleContext';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useUsageStats } from '../hooks/useUsageStats';
-import { PriorityLevel } from '../types';
+import { RiskType, UrgencyLevel } from '../types';
 
 export const ReportScreen: React.FC = () => {
-  const { addCase, showToast, setActiveTab } = useCases();
-  const { currentUserName, currentRole, isSupervisor } = useRole();
+  const { addCase, showToast, setActiveTab, setSelectedCaseForClosureId } = useCases();
   const { logInteraction } = useUsageStats();
 
-  const [tipo, setTipo] = useState<string>(TIPO_CONDICIONES[0]);
-  const [frente, setFrente] = useState<string>(FRENTES_OBRA[0]);
-  const [sectorDetalle, setSectorDetalle] = useState<string>('Piso 14 - Losa central');
-  const [prioridad, setPrioridad] = useState<PriorityLevel>('Alto');
-  const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>(
-    SUPERVISOR_LIST[0].id
+  // Automatic GPS Geolocation Hook
+  const {
+    coordinates,
+    isLoading: isGpsLoading,
+    error: gpsError,
+    isLiveGps,
+    refreshLocation: refreshGps,
+    formatCoordinates,
+  } = useGeolocation();
+
+  const [selectedRisk, setSelectedRisk] = useState<RiskType>('Falta de Casco');
+  const [selectedLocation, setSelectedLocation] = useState<string>(WORK_FRONTS[0].name);
+  const [selectedUrgency, setSelectedUrgency] = useState<UrgencyLevel>('Alto');
+  const [description, setDescription] = useState<string>(
+    'Operario realizando armado de fierro sin casco de seguridad reglamentario bajo gancho de grúa.'
   );
-  const [descripcion, setDescripcion] = useState<string>(
-    'Personal realizando trabajo en altura sobre andamio sin arnés anclado a línea de vida certificada.'
-  );
-  const [fotoUrl, setFotoUrl] = useState<string>(
-    'https://images.unsplash.com/photo-1541888946425-d0fbb186156f?w=800&auto=format&fit=crop&q=80'
-  );
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [photoPreview, setPhotoPreview] = useState<string>(ASSETS.cctv1);
+  const [submittedModalOpen, setSubmittedModalOpen] = useState<boolean>(false);
+  const [createdCaseId, setCreatedCaseId] = useState<string>('QW-104');
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
 
-  // Voice Parsing Helper
-  const parseVoiceInput = (text: string) => {
-    const lower = text.toLowerCase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textBeforeDictationRef = useRef<string>('');
 
-    // Condition Auto-selection
-    if (lower.includes('casco')) {
-      setTipo('Falta de Casco');
-    } else if (lower.includes('chaleco')) {
-      setTipo('Sin Chaleco');
-    } else if (lower.includes('arnés') || lower.includes('altura') || lower.includes('caída')) {
-      setTipo('Altura sin Arnés');
-      setPrioridad('Crítico');
-    } else if (lower.includes('baranda') || lower.includes('borde') || lower.includes('vano')) {
-      setTipo('Zona sin Baranda');
-      setPrioridad('Crítico');
-    } else if (lower.includes('charco') || lower.includes('eléctric') || lower.includes('resbal') || lower.includes('cable')) {
-      setTipo('Piso Resbaladizo');
-    }
-
-    // Front Auto-selection
-    if (lower.includes('frente sur') || lower.includes('excavación')) {
-      setFrente('Frente Sur (Excavación)');
-    } else if (lower.includes('losa') || lower.includes('piso 14') || lower.includes('frente b')) {
-      setFrente('Frente B (Losa Piso 14)');
-    } else if (lower.includes('fachada') || lower.includes('torre')) {
-      setFrente('Frente A (Torre Principal)');
-    }
-
-    // Priority Auto-selection
-    if (lower.includes('crítico') || lower.includes('inmediato') || lower.includes('urgente') || lower.includes('parar')) {
-      setPrioridad('Crítico');
-    } else if (lower.includes('medio') || lower.includes('leve')) {
-      setPrioridad('Medio');
-    }
-  };
-
-  // Speech Recognition Hook
+  // Native SpeechRecognition Hook
   const {
     isListening,
-    transcript,
-    isSupported: speechSupported,
+    interimTranscript,
+    isSupported,
+    error: speechError,
     startListening,
     stopListening,
-    resetTranscript,
   } = useSpeechRecognition({
-    onResult: (text) => {
-      setDescripcion((prev) => (prev ? `${prev} ${text}` : text));
-      parseVoiceInput(text);
-      showToast('🎙️ Dictado por voz procesado con auto-detección');
+    lang: 'es-PE',
+    continuous: true,
+    interimResults: true,
+    onResult: (finalText) => {
+      const base = textBeforeDictationRef.current.trim();
+      const combined = base ? `${base} ${finalText.trim()}` : finalText.trim();
+      setDescription(combined);
+    },
+    onError: (err) => {
+      setVoiceNotice(err);
+      showToast(err);
+    },
+    onEnd: () => {
+      setVoiceNotice(null);
     },
   });
 
-  const handleSimulatedVoice = (demoText: string) => {
-    setDescripcion(demoText);
-    parseVoiceInput(demoText);
-    showToast('🎙️ Transcripción por voz simulada con éxito');
-  };
-
-  // Geolocation Hook
-  const {
-    coordinates,
-    isLoading: geoLoading,
-    error: geoError,
-    refreshLocation,
-  } = useGeolocation();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setFotoUrl(reader.result);
+          setPhotoPreview(reader.result);
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleVoiceToggle = () => {
+    if (isListening) {
+      stopListening();
+      logInteraction('otro', 'Dictado por voz finalizado en Detalle del Incidente');
+      showToast('Dictado por voz detenido y registrado');
+    } else {
+      textBeforeDictationRef.current = description;
+      if (!isSupported) {
+        // Safe fallback for environments with restricted speech APIs
+        setVoiceNotice('Navegador sin SpeechRecognition nativo. Insertando dictado asistido.');
+        showToast('Navegador sin Web Speech API: agregando nota asistida');
+        setTimeout(() => {
+          setDescription((prev) =>
+            prev.trim()
+              ? `${prev.trim()} [Dictado: Personal detectado en zona de izaje sin barbiquejo reglamentario].`
+              : 'Personal detectado en zona de izaje sin barbiquejo reglamentario.'
+          );
+          logInteraction('otro', 'Nota de voz asistida incorporada');
+          showToast('Nota técnica incorporada con éxito');
+          setVoiceNotice(null);
+        }, 1200);
+        return;
+      }
+
+      startListening({ append: true });
+      showToast('Micrófono activado · Hable con claridad en obra para dictar el detalle');
+      logInteraction('otro', 'Iniciado dictado por voz SpeechRecognition en Detalle del Incidente');
+    }
+  };
+
+  const handleQuickInsert = (phrase: string) => {
+    setDescription((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed} ${phrase}` : phrase;
+    });
+    showToast('Frase técnica incorporada');
+  };
+
+  const handleClearDescription = () => {
+    setDescription('');
+    textBeforeDictationRef.current = '';
+    showToast('Detalle del incidente limpiado');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
-    const isUnassigned = selectedSupervisorId === 'unassigned';
-    const chosenSup = isUnassigned
-      ? null
-      : SUPERVISOR_LIST.find((s) => s.id === selectedSupervisorId) || null;
+    if (!selectedRisk || !selectedLocation) {
+      showToast('Por favor selecciona tipo de riesgo y ubicación');
+      return;
+    }
 
-    const newCase = addCase({
-      tipo,
-      frente,
-      ubicacion: sectorDetalle,
-      prioridad,
-      urgencia: prioridad === 'Crítico' ? 'Alto' : prioridad === 'Alto' ? 'Medio' : 'Bajo',
-      asignadoA: chosenSup ? { nombre: chosenSup.nombre, rol: chosenSup.rol } : null,
-      responsable: chosenSup ? chosenSup.nombre : 'Sin Asignar (Pendiente SSOMA)',
-      detectadoPor: `${currentUserName} (${currentRole})`,
-      fotoUrl,
-      descripcion,
-      confianzaIA: 98,
-      coordenadas: coordinates || {
-        lat: -12.096841,
-        lng: -77.035219,
-        accuracy: 4,
-        altitude: 104,
-        timestamp: Date.now(),
-        origen: 'CALIBRADO_OBRA',
-      },
+    const created = addCase({
+      tipo: selectedRisk,
+      ubicacion: selectedLocation.split('(')[0].trim(),
+      frente: selectedLocation,
+      urgencia: selectedUrgency,
+      estado: 'Abierto',
+      detectadoPor: 'Reporte Manual',
+      responsable: 'Ing. Carlos Mendoza (Prevencionista)',
+      fotoUrl: photoPreview,
+      descripcion: description.trim(),
+      coordenadas: coordinates,
     });
 
-    logInteraction('reporte', `Incidente #${newCase.id} reportado en ${frente}: ${tipo}`);
-    showToast(
-      isUnassigned
-        ? `Caso #${newCase.id} creado como "Abierto"`
-        : `Caso #${newCase.id} asignado a ${chosenSup?.nombre}`
-    );
+    setCreatedCaseId(created.id);
+    setSelectedCaseForClosureId(created.id);
+    setSubmittedModalOpen(true);
+    logInteraction('reporte', `Reporte manual #${created.id} emitido: ${selectedRisk} en ${selectedLocation}`);
+    showToast(`Reporte #${created.id} registrado y notificado con éxito`);
+  };
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      if (isSupervisor) {
-        setActiveTab('mis-pendientes');
-      } else {
-        setActiveTab('dashboard');
-      }
-    }, 400);
+  const resetForm = () => {
+    setSubmittedModalOpen(false);
+    setSelectedRisk('Falta de Casco');
+    setDescription('');
   };
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-4 max-w-md sm:max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto animate-fade-in">
-      {/* Title */}
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-4 max-w-md sm:max-w-2xl md:max-w-4xl lg:max-w-5xl mx-auto">
+      {/* 1. Top Wizard Progress Banner */}
+      <div className="w-full bg-[#131b2e] rounded-2xl p-3.5 border border-[#222a3d] flex flex-col gap-2 shadow-md">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-[#f59e0b] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-[#f59e0b]/15 border border-[#f59e0b]/30">
-              FORMULARIO DE CAMPO · QAWAQ
+            <div className="w-6 h-6 rounded-lg bg-[#f59e0b]/20 flex items-center justify-center text-[#f59e0b]">
+              <Zap className="w-3.5 h-3.5 fill-[#f59e0b]" />
+            </div>
+            <span className="font-['Chivo'] font-bold text-xs text-[#ffb95f] uppercase tracking-wide">
+              Reporte de Campo Express
             </span>
           </div>
-          <h1 className="font-['Chivo'] font-black text-xl sm:text-2xl text-[#dae2fd] uppercase tracking-tight mt-1">
-            Reportar Condición Subestándar
-          </h1>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#1e293b] border border-[#334155]">
+            <Timer className="w-3 h-3 text-[#10b981] animate-pulse" />
+            <span className="font-mono text-[10px] text-[#10b981] font-bold">~25 SEG</span>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-[#1e293b] h-2 rounded-full overflow-hidden flex">
+          <div className="bg-[#f59e0b] h-full w-2/3 rounded-full transition-all duration-500 ease-out" />
+        </div>
+
+        <div className="flex justify-between items-center text-[#94a3b8] font-mono text-[9px]">
+          <span>PASO 2 DE 3: VERIFICACIÓN</span>
+          <span className="font-bold text-[#ffb95f]">66% COMPLETADO</span>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Photo Evidence Upload Box */}
-        <div id="camera-capture-box" className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-4 shadow-xl space-y-3">
-          <label className="block text-xs font-mono font-bold uppercase text-[#dae2fd] flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Camera className="w-4 h-4 text-[#f59e0b]" /> Registro Fotográfico del Hallazgo:
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {/* 2. Evidencia Fotográfica */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase">
+              <Camera className="w-4 h-4 text-[#f59e0b]" />
+              Evidencia Fotográfica
+            </label>
+            <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-[#10b981]/15 text-[#34d399] font-semibold border border-[#10b981]/30">
+              CAPTURA CCTV
             </span>
-            <span className="text-[10px] text-[#94a3b8]">JPG / PNG / Cámara</span>
-          </label>
-
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-[#060e20] border-2 border-dashed border-[#334155] group hover:border-[#f59e0b] transition-colors">
-            {fotoUrl ? (
-              <img
-                src={fotoUrl}
-                alt="Evidencia fotográfica"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-[#64748b] gap-2 p-4 text-center">
-                <Upload className="w-8 h-8" />
-                <span className="font-mono text-xs">Toca o arrastra una fotografía</span>
-              </div>
-            )}
-
-            <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-              <Camera className="w-8 h-8 text-[#f59e0b] mb-1" />
-              <span className="font-['Chivo'] font-bold text-xs text-white uppercase tracking-wider">
-                Cambiar Fotografía
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
           </div>
 
-          {/* Quick CCTV Photo Selector */}
-          <div className="space-y-1.5 pt-1">
-            <div className="text-[10px] font-mono uppercase text-[#94a3b8] flex items-center justify-between font-bold">
-              <span>Evidencia Fotográfica Rápida (Cámaras 1 a 5):</span>
-              <span className="text-[#f59e0b]">Toca para asignar</span>
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#060e20] border border-[#222a3d] shadow-xl group">
+            <img
+              src={photoPreview}
+              alt="Evidencia fotográfica del riesgo"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#060e20]/90 via-transparent to-[#060e20]/40 pointer-events-none" />
+
+            {/* Infracción overlay tag */}
+            <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 pointer-events-none">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#ef4444]/90 text-white backdrop-blur-md shadow text-[9px] font-mono font-bold uppercase tracking-wide">
+                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                PUNTO DE RIESGO IDENTIFICADO
+              </div>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#060e20]/80 text-[#94a3b8] backdrop-blur-md font-mono text-[8px]">
+                <span>SITE_CAM_04 // PISO 14</span>
+              </div>
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {[
-                { url: ASSETS.cctv1, label: 'CAM 01' },
-                { url: ASSETS.cctv2, label: 'CAM 02' },
-                { url: ASSETS.cctv3, label: 'CAM 03' },
-                { url: ASSETS.cctv4, label: 'CAM 04' },
-                { url: ASSETS.cctv5, label: 'CAM 05' },
-              ].map((c, idx) => (
+
+            {/* Bottom tools over photo */}
+            <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#0b1326]/90 text-[#dae2fd] backdrop-blur-md max-w-[70%] border border-[#1e293b]">
+                <MapPin className="w-3 h-3 text-[#f59e0b] shrink-0" />
+                <span className="font-mono text-[9px] truncate">
+                  Lat -12.086, Long -77.032 (Torre 2)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
                 <button
-                  key={idx}
                   type="button"
-                  onClick={() => setFotoUrl(c.url)}
-                  className={`relative aspect-video rounded-lg overflow-hidden border transition-all ${
-                    fotoUrl === c.url
-                      ? 'border-[#f59e0b] ring-2 ring-[#f59e0b]/60 scale-105 shadow-md'
-                      : 'border-[#1e293b] opacity-60 hover:opacity-100 hover:border-[#334155]'
-                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-[#1e293b]/90 hover:bg-[#283548] text-[#dae2fd] rounded-lg backdrop-blur-md transition-all font-mono text-[9px] uppercase border border-[#334155] active:scale-95 shadow-md"
                 >
-                  <img src={c.url} alt={c.label} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-0.5">
-                    <span className="font-mono text-[7px] font-black text-white truncate">
-                      {c.label}
-                    </span>
-                  </div>
+                  <Upload className="w-3 h-3 text-[#f59e0b]" />
+                  <span>Subir</span>
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* GPS Geolocation Banner */}
-        <div className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-3.5 shadow-xl flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-[#10b981]/15 text-[#10b981] flex items-center justify-center border border-[#10b981]/30 shrink-0">
-              <Navigation className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-mono text-[10px] uppercase text-[#94a3b8] font-bold">
-                Coordenadas GPS de Campo (Automático)
-              </div>
-              <div className="font-mono text-xs text-[#dae2fd] truncate">
-                {geoLoading ? (
-                  <span className="text-[#f59e0b]">Capturando satélites GPS...</span>
-                ) : coordinates ? (
-                  `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)} (±${Math.round(coordinates.accuracy)}m)`
-                ) : (
-                  '-12.096841, -77.035219 (Fijo Torre Andina)'
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoPreview(
+                      photoPreview === ASSETS.cctv1 ? ASSETS.cctv2 : ASSETS.cctv1
+                    )
+                  }
+                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-[#1e293b]/90 hover:bg-[#283548] text-[#dae2fd] rounded-lg backdrop-blur-md transition-all font-mono text-[9px] uppercase border border-[#334155] active:scale-95 shadow-md"
+                >
+                  <RefreshCw className="w-3 h-3 text-[#f59e0b]" />
+                  <span>Retomar</span>
+                </button>
               </div>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={refreshLocation}
-            className="p-2 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#94a3b8] hover:text-[#dae2fd] border border-[#334155] transition-colors"
-            title="Refrescar posición GPS"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${geoLoading ? 'animate-spin text-[#f59e0b]' : ''}`} />
-          </button>
-        </div>
-
-        {/* Risk Classification & Location */}
-        <div className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-4 shadow-xl space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1">
-                Tipo de Condición Subestándar:
-              </label>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                className="w-full bg-[#070d18] border border-[#222a3d] rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none"
-              >
-                {TIPO_CONDICIONES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1">
-                Frente Operativo:
-              </label>
-              <select
-                value={frente}
-                onChange={(e) => setFrente(e.target.value)}
-                className="w-full bg-[#070d18] border border-[#222a3d] rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none"
-              >
-                {FRENTES_OBRA.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1">
-              Sector Específico / Losa / Nivel:
-            </label>
             <input
-              type="text"
-              required
-              value={sectorDetalle}
-              onChange={(e) => setSectorDetalle(e.target.value)}
-              placeholder="Ej. Piso 14 - Losa central, frente a ducto de ascensores"
-              className="w-full bg-[#070d18] border border-[#222a3d] rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none"
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
             />
           </div>
+        </div>
 
-          {/* Priority & Assignee Configuration */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#1e293b]">
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1 flex items-center gap-1">
-                <Clock className="w-3 h-3 text-[#f59e0b]" /> Prioridad & Plazo SLA:
-              </label>
-              <div className="grid grid-cols-3 gap-1">
-                {(['Crítico', 'Alto', 'Medio'] as PriorityLevel[]).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPrioridad(p)}
-                    className={`py-1.5 px-1 rounded-lg font-mono text-[10px] uppercase font-bold border transition-all ${
-                      prioridad === p
-                        ? p === 'Crítico'
-                          ? 'bg-red-500 text-white border-red-300'
-                          : p === 'Alto'
-                          ? 'bg-[#f59e0b] text-[#2a1700] border-[#ffddb8]'
-                          : 'bg-cyan-500 text-[#022c22] border-cyan-300'
-                        : 'bg-[#0b1326] text-[#94a3b8] border-[#1e293b]'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-              <span className="text-[9px] font-mono text-[#64748b] block mt-1">
-                {prioridad === 'Crítico'
-                  ? 'SLA 30 min (Inmediato)'
-                  : prioridad === 'Alto'
-                  ? 'SLA 2 horas (Urgente)'
-                  : 'SLA 24 horas (Estándar)'}
-              </span>
-            </div>
+        {/* 3. Tipo de Riesgo (Chips Grid) */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase">
+              <ShieldAlert className="w-4 h-4 text-[#f59e0b]" />
+              Tipo de Riesgo
+            </span>
+            <span className="font-mono text-[9px] text-[#94a3b8] uppercase">
+              SELECCIÓN RÁPIDA
+            </span>
+          </div>
 
-            <div>
-              <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1 flex items-center gap-1">
-                <HardHat className="w-3 h-3 text-[#10b981]" /> Asignar Responsable en Campo:
-              </label>
-              <select
-                value={selectedSupervisorId}
-                onChange={(e) => setSelectedSupervisorId(e.target.value)}
-                className="w-full bg-[#070d18] border border-[#222a3d] rounded-xl px-2.5 py-2 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none"
-              >
-                <option value="unassigned">Sin Asignar (Dejar Abierto para SSOMA)</option>
-                {SUPERVISOR_LIST.map((sup) => (
-                  <option key={sup.id} value={sup.id}>
-                    {sup.nombre} ({sup.rol})
-                  </option>
-                ))}
-              </select>
-              <span className="text-[9px] font-mono text-[#64748b] block mt-1">
-                {selectedSupervisorId === 'unassigned'
-                  ? 'Nacerá como "Abierto"'
-                  : 'Nacerá directo como "Asignado"'}
-              </span>
+          <div className="grid grid-cols-2 gap-2">
+            {RISK_TYPES.map((risk) => {
+              const isSelected = selectedRisk === risk.id;
+              return (
+                <button
+                  key={risk.id}
+                  type="button"
+                  onClick={() => setSelectedRisk(risk.id)}
+                  className={`min-h-[46px] px-3 py-2 rounded-xl flex items-center gap-2 text-left transition-all active:scale-95 font-sans text-xs border ${
+                    isSelected
+                      ? 'bg-[#f59e0b] text-[#2a1700] font-bold border-[#ffddb8] shadow-md shadow-[#f59e0b]/20'
+                      : 'bg-[#131b2e] text-[#94a3b8] hover:bg-[#1a2337] border-[#222a3d]'
+                  }`}
+                >
+                  {isSelected ? (
+                    <CheckCircle2 className="w-4 h-4 text-[#2a1700] shrink-0" />
+                  ) : (
+                    <HardHat className="w-4 h-4 opacity-40 shrink-0" />
+                  )}
+                  <span className="truncate">{risk.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4. Ubicación / Frente de Obra */}
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="obra-location"
+            className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase"
+          >
+            <MapPin className="w-4 h-4 text-[#f59e0b]" />
+            Ubicación / Frente de Obra
+          </label>
+          <div className="relative">
+            <select
+              id="obra-location"
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full h-12 px-3.5 pr-9 rounded-xl bg-[#131b2e] text-[#dae2fd] font-sans text-xs border border-[#222a3d] focus:outline-none focus:border-[#f59e0b] shadow-inner appearance-none cursor-pointer"
+            >
+              {WORK_FRONTS.map((wf) => (
+                <option key={wf.id} value={wf.name} className="bg-[#0b1326] text-[#dae2fd]">
+                  {wf.name}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">
+              ▼
             </div>
           </div>
 
-          {/* Hands-Free Voice Recognition Module */}
-          <div className="rounded-xl p-3 bg-[#070d18] border border-[#222a3d] space-y-2.5">
+          {/* Automatic GPS Geolocation Pinning Widget */}
+          <div className="mt-1.5 p-3 rounded-xl bg-[#0b1326] border border-[#1e293b] flex flex-col gap-2 shadow-inner">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                    isListening
-                      ? 'bg-red-500 text-white'
-                      : 'bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/40'
+                  className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${
+                    isLiveGps ? 'bg-[#10b981]/20 text-[#10b981]' : 'bg-[#f59e0b]/20 text-[#f59e0b]'
                   }`}
                 >
-                  <Mic className="w-3.5 h-3.5" />
+                  <Crosshair className={`w-4 h-4 ${isGpsLoading ? 'animate-spin' : ''}`} />
                 </div>
-                <div>
-                  <span className="font-mono text-[10px] uppercase font-bold text-white block">
-                    Reporte por Voz Manos Libres
-                  </span>
-                  <span className="font-mono text-[8px] text-[#94a3b8]">
-                    {isListening
-                      ? '🎙️ Grabando audio en directo... Habla claro'
-                      : 'Presiona el micrófono para dictar sin usar las manos'}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[9px] uppercase font-bold text-[#94a3b8] truncate">
+                      Punto GPS Fijado Automáticamente
+                    </span>
+                    <span
+                      className={`font-mono text-[8px] px-1.5 py-0.2 rounded font-bold uppercase shrink-0 ${
+                        isLiveGps
+                          ? 'bg-[#10b981]/20 text-[#34d399] border border-[#10b981]/40'
+                          : 'bg-[#f59e0b]/20 text-[#ffc174] border border-[#f59e0b]/40'
+                      }`}
+                    >
+                      {isLiveGps ? 'GPS Satelital' : 'Calibrado Obra'}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] text-[#dae2fd] font-bold truncate block">
+                    {isGpsLoading ? 'Adquiriendo fijación satelital...' : formatCoordinates()}
                   </span>
                 </div>
               </div>
 
               <button
-                id="voice-dictation-btn"
                 type="button"
-                onClick={isListening ? stopListening : startListening}
-                className={`px-3 py-1.5 rounded-xl font-mono text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 active:scale-95 shadow-md ${
+                onClick={refreshGps}
+                disabled={isGpsLoading}
+                className="px-2 py-1 rounded-lg bg-[#1e293b] hover:bg-[#283548] border border-[#334155] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[9px] uppercase flex items-center gap-1 active:scale-95 transition-all shrink-0"
+                title="Recalibrar señal GPS del dispositivo"
+              >
+                <RefreshCw className={`w-3 h-3 text-[#f59e0b] ${isGpsLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Recalibrar</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[9px] font-mono border-t border-[#1e293b] pt-1.5 text-[#64748b]">
+              <span className="flex items-center gap-1 text-[#10b981]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-ping" />
+                <span>Precisión: ±{coordinates.accuracy || 3.5}m</span>
+                {coordinates.altitude && <span>· Alt: {coordinates.altitude}m</span>}
+              </span>
+              <span className="text-[#94a3b8]">
+                {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Nivel de Urgencia */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase">
+              <AlertTriangle className="w-4 h-4 text-[#f59e0b]" />
+              Nivel de Urgencia
+            </label>
+            <span
+              className={`font-mono text-[9px] font-bold uppercase ${
+                selectedUrgency === 'Alto'
+                  ? 'text-[#ef4444]'
+                  : selectedUrgency === 'Medio'
+                  ? 'text-[#f59e0b]'
+                  : 'text-[#10b981]'
+              }`}
+            >
+              {selectedUrgency === 'Alto' ? 'CRÍTICO REQUIERE ACCIÓN' : 'ESTÁNDAR OPERATIVO'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {/* Bajo */}
+            <button
+              type="button"
+              onClick={() => setSelectedUrgency('Bajo')}
+              className={`min-h-[48px] rounded-xl flex flex-col items-center justify-center p-1.5 border transition-all active:scale-95 ${
+                selectedUrgency === 'Bajo'
+                  ? 'bg-[#10b981] text-[#022c22] border-[#a7f3d0] font-bold shadow-md shadow-[#10b981]/25'
+                  : 'bg-[#131b2e] text-[#94a3b8] border-[#222a3d]'
+              }`}
+            >
+              <span className="font-['Chivo'] font-bold text-xs uppercase">Bajo</span>
+              <span className="font-mono text-[8px] opacity-80">Preventivo</span>
+            </button>
+
+            {/* Medio */}
+            <button
+              type="button"
+              onClick={() => setSelectedUrgency('Medio')}
+              className={`min-h-[48px] rounded-xl flex flex-col items-center justify-center p-1.5 border transition-all active:scale-95 ${
+                selectedUrgency === 'Medio'
+                  ? 'bg-[#f59e0b] text-[#2a1700] border-[#ffddb8] font-bold shadow-md shadow-[#f59e0b]/25'
+                  : 'bg-[#131b2e] text-[#94a3b8] border-[#222a3d]'
+              }`}
+            >
+              <span className="font-['Chivo'] font-bold text-xs uppercase">Medio</span>
+              <span className="font-mono text-[8px] opacity-80">48 Horas</span>
+            </button>
+
+            {/* Alto */}
+            <button
+              type="button"
+              onClick={() => setSelectedUrgency('Alto')}
+              className={`min-h-[48px] rounded-xl flex flex-col items-center justify-center p-1.5 border transition-all active:scale-95 ${
+                selectedUrgency === 'Alto'
+                  ? 'bg-[#ef4444] text-white border-[#fca5a5] font-bold shadow-md shadow-[#ef4444]/30'
+                  : 'bg-[#131b2e] text-[#94a3b8] border-[#222a3d]'
+              }`}
+            >
+              <div className="flex items-center gap-1">
+                <span className="font-['Chivo'] font-bold text-xs uppercase">Alto</span>
+              </div>
+              <span className="font-mono text-[8px] opacity-90">Parada Trabajo</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6. Detalle del Incidente con Reconocimiento de Voz SpeechRecognition */}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label
+              htmlFor="report-desc"
+              className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase"
+            >
+              <Shield className="w-4 h-4 text-[#f59e0b]" />
+              Detalle del Incidente
+            </label>
+
+            <div className="flex items-center gap-1.5">
+              {description && (
+                <button
+                  type="button"
+                  onClick={handleClearDescription}
+                  title="Limpiar descripción"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#1e293b] font-mono text-[9px] uppercase border border-transparent hover:border-[#334155] transition-all"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span className="hidden sm:inline">Limpiar</span>
+                </button>
+              )}
+
+              {/* Native SpeechRecognition Voice-to-Text Button */}
+              <button
+                type="button"
+                id="voice-dictation-btn"
+                onClick={handleVoiceToggle}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-md active:scale-95 ${
                   isListening
-                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/30'
-                    : 'bg-[#f59e0b] hover:bg-[#d97706] text-[#2a1700] shadow-[#f59e0b]/20'
+                    ? 'bg-[#ef4444] hover:bg-[#dc2626] text-white border-[#fca5a5] shadow-[#ef4444]/30 animate-pulse'
+                    : 'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30 hover:bg-[#f59e0b]/25 shadow-[#f59e0b]/10'
                 }`}
               >
                 {isListening ? (
                   <>
                     <MicOff className="w-3.5 h-3.5" />
-                    <span>Detener</span>
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
+                      Detener Dictado
+                    </span>
+                    {/* Live audio waves */}
+                    <div className="flex items-center gap-0.5 ml-1">
+                      <span className="w-1 h-3 bg-white rounded-full animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1 h-4 bg-white rounded-full animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1 h-2 bg-white rounded-full animate-bounce [animation-delay:300ms]" />
+                    </div>
                   </>
                 ) : (
                   <>
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>Iniciar Voz</span>
+                    <Mic className="w-3.5 h-3.5 text-[#f59e0b]" />
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
+                      Dictar por Voz
+                    </span>
                   </>
                 )}
               </button>
             </div>
+          </div>
 
-            {/* Simulated Voice Quick Presets for Demo */}
-            <div className="space-y-1">
-              <span className="text-[9px] font-mono text-[#64748b] block uppercase">
-                Probar Dictado Inteligente con Auto-Selección:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSimulatedVoice(
-                      'Operario armando fierro en altura sin arnés ni línea de vida en Frente B Losa Piso 14 riesgo crítico'
-                    )
-                  }
-                  className="px-2 py-1 rounded-lg bg-[#131b2e] hover:bg-[#1e293b] text-[#cbd5e1] font-mono text-[9px] border border-[#334155] transition-colors"
-                >
-                  🎙️ "Operario en altura sin arnés en Piso 14 riesgo crítico"
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSimulatedVoice(
-                      'Cuadrilla transitando por rampa vehicular sin chaleco reflectivo en Frente Sur'
-                    )
-                  }
-                  className="px-2 py-1 rounded-lg bg-[#131b2e] hover:bg-[#1e293b] text-[#cbd5e1] font-mono text-[9px] border border-[#334155] transition-colors"
-                >
-                  🎙️ "Sin chaleco en rampa de Frente Sur"
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleSimulatedVoice(
-                      'Charco de agua con cables eléctricos expuestos y carretilla en sótano'
-                    )
-                  }
-                  className="px-2 py-1 rounded-lg bg-[#131b2e] hover:bg-[#1e293b] text-[#cbd5e1] font-mono text-[9px] border border-[#334155] transition-colors"
-                >
-                  🎙️ "Charco con cables eléctricos y riesgo de resbalón"
-                </button>
+          {/* Active Listening Real-Time Feedback Banner */}
+          {isListening && (
+            <div className="bg-[#0b1326] border border-[#ef4444]/40 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-inner">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] animate-ping shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono text-[9px] text-[#ef4444] font-bold uppercase tracking-wider">
+                    Micrófono en Vivo (SpeechRecognition API es-PE)
+                  </span>
+                  <span className="font-sans text-xs text-[#dae2fd] italic truncate">
+                    {interimTranscript ? `"${interimTranscript}..."` : 'Hable ahora: dictando directamente al reporte...'}
+                  </span>
+                </div>
               </div>
+              <Volume2 className="w-4 h-4 text-[#ef4444] animate-pulse shrink-0" />
             </div>
+          )}
 
-            {/* Description Textarea */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-mono uppercase text-[#94a3b8] font-bold">
-                  Transcripción / Descripción del Incidente:
-                </label>
-                {transcript && (
-                  <span className="text-[8px] font-mono text-emerald-400">● Reconociendo voz</span>
-                )}
-              </div>
-              <textarea
-                rows={3}
-                required
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Detalla qué está ocurriendo, cantidad de personas en riesgo y equipo involucrado..."
-                className="w-full bg-[#0b1326] border border-[#222a3d] rounded-xl p-3 text-xs text-[#dae2fd] font-mono focus:border-[#f59e0b] outline-none leading-relaxed"
-              />
+          {voiceNotice && !isListening && (
+            <div className="bg-[#0b1326] border border-[#334155] rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono text-[#94a3b8]">
+              <span>{voiceNotice}</span>
+              <button
+                type="button"
+                onClick={() => setVoiceNotice(null)}
+                className="text-[#f59e0b] hover:underline ml-2"
+              >
+                Cerrar
+              </button>
             </div>
+          )}
+
+          {/* Text Area */}
+          <div className="relative w-full">
+            <textarea
+              id="report-desc"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describa el acto o condición subestándar (o presione 'Dictar por Voz' para hablar con manos libres)..."
+              className={`w-full p-3 rounded-xl bg-[#131b2e] text-[#dae2fd] font-sans text-xs border transition-all focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-[#64748b] ${
+                isListening
+                  ? 'border-[#ef4444] ring-2 ring-[#ef4444]/20'
+                  : 'border-[#222a3d] focus:border-[#f59e0b]'
+              }`}
+            />
+            <div className="absolute bottom-2 right-2 flex items-center gap-1.5 text-[#10b981] bg-[#060e20]/90 px-2 py-0.5 rounded-md border border-[#10b981]/30 backdrop-blur font-mono text-[8px] uppercase">
+              <Sparkles className="w-2.5 h-2.5 text-[#f59e0b]" />
+              <span>Voz a Texto Activo</span>
+            </div>
+          </div>
+
+          {/* Hands-Free Quick Inserts for Construction Sites */}
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
+            <span className="font-mono text-[9px] text-[#94a3b8] uppercase shrink-0">
+              Atajos de voz:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleQuickInsert('Sin línea de vida conectada en altura.')}
+              className="px-2 py-0.5 rounded-lg bg-[#0b1326] hover:bg-[#1a2337] border border-[#1e293b] hover:border-[#334155] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[9px] shrink-0 transition-colors"
+            >
+              + Sin línea de vida
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickInsert('Barbiquejo desabrochado en zona de izaje.')}
+              className="px-2 py-0.5 rounded-lg bg-[#0b1326] hover:bg-[#1a2337] border border-[#1e293b] hover:border-[#334155] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[9px] shrink-0 transition-colors"
+            >
+              + Barbiquejo suelto
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickInsert('Excavación sin baranda rígida perimétrica.')}
+              className="px-2 py-0.5 rounded-lg bg-[#0b1326] hover:bg-[#1a2337] border border-[#1e293b] hover:border-[#334155] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[9px] shrink-0 transition-colors"
+            >
+              + Sin baranda rígida
+            </button>
           </div>
         </div>
 
-        {/* Submit Button */}
-        <button
-          id="submit-report-btn"
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full h-13 py-3 px-4 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-50 text-[#2a1700] font-['Chivo'] font-black text-sm uppercase tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-[#f59e0b]/25 transition-all active:scale-95"
-        >
-          <Send className="w-4 h-4" />
-          <span>{isSubmitting ? 'Registrando en Obra...' : 'Generar Reporte Oficial'}</span>
-        </button>
+        {/* 7. Big Submit Button */}
+        <div className="pt-1">
+          <button
+            type="submit"
+            className="w-full h-13 py-3.5 px-4 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] active:scale-[0.98] text-[#2a1700] font-['Chivo'] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-[#f59e0b]/25 transition-all"
+          >
+            <Send className="w-4 h-4 fill-[#2a1700]" />
+            <span>Enviar Reporte de Incidencia</span>
+          </button>
+        </div>
       </form>
+
+      {/* Confirmation Modal */}
+      {submittedModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#060e20]/85 backdrop-blur-md flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-[#131b2e] border border-[#222a3d] rounded-2xl p-5 shadow-2xl flex flex-col items-center text-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-[#10b981]/20 flex items-center justify-center text-[#10b981] border border-[#10b981]/40">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="font-mono text-[9px] text-[#f59e0b] uppercase font-bold tracking-widest">
+                // ALERTA DESPACHADA
+              </span>
+              <h3 className="font-['Chivo'] font-bold text-base text-[#dae2fd]">
+                ¡Reporte #{createdCaseId} Registrado!
+              </h3>
+              <p className="font-sans text-xs text-[#94a3b8] mt-1 leading-relaxed">
+                Notificación de parada inmediata remitida al Ing. Carlos Mendoza y supervisor de cuadrilla.
+              </p>
+            </div>
+
+            {/* GPS coordinates confirmation banner */}
+            <div className="w-full p-2.5 rounded-xl bg-[#0b1326] border border-[#1e293b] flex items-center justify-between text-left font-mono text-[10px]">
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-[#10b981] shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[8px] text-[#94a3b8] uppercase block">
+                    Punto GPS Fijado
+                  </span>
+                  <span className="text-[#dae2fd] font-bold truncate block">
+                    {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9px] text-[#10b981] font-semibold bg-[#10b981]/15 px-1.5 py-0.5 rounded border border-[#10b981]/30 shrink-0">
+                ±{coordinates.accuracy || 3.5}m
+              </span>
+            </div>
+
+            <div className="w-full flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmittedModalOpen(false);
+                  setActiveTab('dashboard');
+                }}
+                className="w-full h-11 rounded-xl bg-[#f59e0b] text-[#2a1700] font-['Chivo'] font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-md hover:bg-[#d97706] active:scale-95 transition-all"
+              >
+                <span>Ver en Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                className="w-full h-10 rounded-xl bg-[#1e293b] text-[#94a3b8] hover:text-[#dae2fd] font-mono text-[11px] font-semibold uppercase active:scale-95 transition-all border border-[#334155]"
+              >
+                Crear Nuevo Reporte
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

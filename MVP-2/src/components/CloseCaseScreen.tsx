@@ -1,390 +1,617 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
-  CheckCircle2,
-  FileCheck2,
+  AlertTriangle,
   Camera,
-  Download,
-  AlertCircle,
-  FileText,
-  Clock,
-  Sparkles,
-  XCircle,
+  CheckCircle2,
+  Check,
+  Bot,
   UserCheck,
+  Mic,
+  FileCheck,
+  Download,
+  LayoutDashboard,
+  Upload,
+  RefreshCw,
+  FileText,
+  Printer,
 } from 'lucide-react';
+import { ASSETS, CORRECTIVE_MEASURES } from '../constants';
 import { useCases } from '../context/CaseContext';
-import { useRole } from '../context/RoleContext';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useUsageStats } from '../hooks/useUsageStats';
 import { PdfExportModal } from './PdfExportModal';
-import { CaseItem } from '../types';
 
 export const CloseCaseScreen: React.FC = () => {
-  const { cases, approveValidation, rejectValidation, closeCase, showToast } = useCases();
-  const { currentRole, isSSOMA, isGerencia } = useRole();
+  const {
+    cases,
+    selectedCaseForClosureId,
+    setSelectedCaseForClosureId,
+    closeCase,
+    setActiveTab,
+    showToast,
+  } = useCases();
   const { logInteraction } = useUsageStats();
 
-  const [selectedCaseId, setSelectedCaseId] = useState<string>(
-    cases.find((c) => c.estado !== 'Cerrado')?.id || cases[0]?.id || ''
-  );
+  // Find candidate case
+  const candidateCases = cases.filter((c) => c.estado !== 'Cerrado');
+  const targetCase =
+    cases.find((c) => c.id === selectedCaseForClosureId) ||
+    candidateCases[0] ||
+    cases[0];
 
-  const [solucionUrl, setSolucionUrl] = useState<string>(
-    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&auto=format&fit=crop&q=80'
-  );
-  const [medidaAplicada, setMedidaAplicada] = useState<string>(
-    'Se paralizó la faena preventivamente, se suministró arnés con doble línea de vida certificada y se capacitó a la cuadrilla.'
+  const [selectedMeasure, setSelectedMeasure] = useState<string>(
+    CORRECTIVE_MEASURES[0]
   );
   const [dictamen, setDictamen] = useState<string>(
-    'Conforme con la Norma Técnica G.050 y el D.S. 011-2019-TR. Condición subestándar neutralizada satisfactoriamente.'
+    'Se detuvo al trabajador en Losa 14, se le proporcionó casco de seguridad nuevo Clase E con barbiquejo homologado y se impartió charla de 5 minutos sobre riesgo de caída de objetos. Condición 100% subsanada.'
+  );
+  const [solutionPhoto, setSolutionPhoto] = useState<string>(ASSETS.resolved);
+
+  const dictamenBeforeRef = useRef<string>('');
+
+  // Native SpeechRecognition for Closure Screen
+  const {
+    isListening,
+    interimTranscript,
+    isSupported,
+    startListening,
+    stopListening,
+  } = useSpeechRecognition({
+    lang: 'es-PE',
+    continuous: true,
+    interimResults: true,
+    onResult: (finalText) => {
+      const base = dictamenBeforeRef.current.trim();
+      const combined = base ? `${base} ${finalText.trim()}` : finalText.trim();
+      setDictamen(combined);
+    },
+    onError: (err) => {
+      showToast(err);
+    },
+  });
+
+  // TWO SEPARATE TOGGLES
+  const [conformeG050, setConformeG050] = useState<boolean>(true);
+  const [conformeDS011, setConformeDS011] = useState<boolean>(true);
+
+  // Success certificate state
+  const [isCaseClosed, setIsCaseClosed] = useState<boolean>(
+    targetCase?.estado === 'Cerrado'
   );
 
-  // Reject modal state
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  // PDF Export Modal state
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
 
-  // PDF Modal
-  const [pdfCase, setPdfCase] = useState<CaseItem | null>(null);
-  const [isPdfOpen, setIsPdfOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedCase = cases.find((c) => c.id === selectedCaseId) || cases[0];
+  useEffect(() => {
+    if (targetCase) {
+      setIsCaseClosed(targetCase.estado === 'Cerrado');
+      if (targetCase.medidaAplicada) {
+        setSelectedMeasure(targetCase.medidaAplicada);
+      }
+      if (targetCase.dictamenCierre) {
+        setDictamen(targetCase.dictamenCierre);
+      }
+      if (targetCase.fotoSolucionUrl) {
+        setSolutionPhoto(targetCase.fotoSolucionUrl);
+      }
+    }
+  }, [targetCase?.id, targetCase?.estado]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (!targetCase) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center min-h-[60vh] max-w-lg mx-auto">
+        <CheckCircle2 className="w-12 h-12 text-[#10b981] mb-2" />
+        <h3 className="font-['Chivo'] font-bold text-base text-[#dae2fd]">
+          No hay casos pendientes de cierre
+        </h3>
+        <p className="font-sans text-xs text-[#94a3b8] mt-1">
+          Todos los riesgos identificados han sido subsanados y archivados en el registro de seguridad.
+        </p>
+      </div>
+    );
+  }
+
+  const handleResolveAndClose = () => {
+    closeCase(targetCase.id, {
+      medidaAplicada: selectedMeasure,
+      dictamenCierre: dictamen,
+      conformeG050,
+      conformeDS011,
+      fotoSolucionUrl: solutionPhoto,
+    });
+    setIsCaseClosed(true);
+    logInteraction('cierre', `Caso #${targetCase.id} subsanado y cerrado con certificación fotográfica`);
+  };
+
+  const handleVoiceToggle = () => {
+    if (isListening) {
+      stopListening();
+      showToast('Dictado de cierre completado');
+    } else {
+      dictamenBeforeRef.current = dictamen;
+      if (!isSupported) {
+        showToast('Navegador sin SpeechRecognition nativo: simulando dictado...');
+        setTimeout(() => {
+          setDictamen(
+            (prev) => `${prev.trim()} [Voz: Verificación de EPP homologado y barbiquejo ejecutada en campo].`
+          );
+          showToast('Dictamen complementado por voz');
+        }, 1200);
+        return;
+      }
+      startListening({ append: true });
+      showToast('Escuchando por micrófono · Dictando resolución de cierre...');
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setSolucionUrl(reader.result);
+          setSolutionPhoto(reader.result);
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleDirectClose = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCase) return;
-
-    closeCase(selectedCase.id, solucionUrl, medidaAplicada, dictamen);
-    logInteraction('cierre', `Caso #${selectedCase.id} cerrado con conformidad SSOMA`);
-    showToast(`Caso #${selectedCase.id} cerrado y certificado con éxito`);
-  };
-
-  const handleApprove = () => {
-    if (!selectedCase) return;
-    approveValidation(selectedCase.id, dictamen);
-  };
-
-  const handleConfirmReject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCase || !rejectReason.trim()) return;
-    rejectValidation(selectedCase.id, rejectReason.trim());
-    setIsRejecting(false);
-  };
-
-  const handleOpenPdf = () => {
-    if (selectedCase) {
-      setPdfCase(selectedCase);
-      setIsPdfOpen(true);
-      logInteraction('pdf', `Acta PDF generada para caso #${selectedCase.id}`);
-    }
-  };
-
-  if (!selectedCase) {
-    return (
-      <div className="p-8 text-center text-[#94a3b8] font-mono">
-        No se han encontrado casos registrados.
-      </div>
-    );
-  }
-
-  const isClosed = selectedCase.estado === 'Cerrado';
-  const isPendingValidation = selectedCase.estado === 'Pendiente de Validación SSOMA';
-
   return (
-    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-5 max-w-4xl mx-auto animate-fade-in">
-      {/* Header */}
-      <div className="bg-[#0c1322] border border-[#222a3d] p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              AUDITORÍA & CERTIFICACIÓN SSOMA
-            </span>
-            <span className="font-mono text-[10px] text-[#94a3b8]">Norma G.050 / DS-011</span>
-          </div>
-          <h1 className="font-['Chivo'] font-black text-xl sm:text-2xl text-[#dae2fd] uppercase tracking-tight">
-            Validación y Cierre de Incidente
-          </h1>
-          <p className="text-xs text-[#94a3b8] mt-0.5">
-            Inspecciona la subsanación realizada en campo, emite dictamen técnico oficial y expide el Acta en PDF.
-          </p>
+    <div className="flex flex-col w-full px-3 sm:px-6 lg:px-8 pt-3 pb-24 gap-4 max-w-md sm:max-w-3xl md:max-w-5xl lg:max-w-6xl mx-auto">
+      {/* 1. Selector if there are multiple cases to choose from */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#131b2e] p-3 rounded-2xl border border-[#222a3d]">
+        <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+          <span className="font-mono text-[9px] text-[#94a3b8] uppercase font-bold shrink-0">
+            CASO ACTIVO:
+          </span>
+          {cases.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedCaseForClosureId(c.id)}
+              className={`px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold uppercase transition-all shrink-0 border flex items-center gap-1.5 ${
+                targetCase.id === c.id
+                  ? 'bg-[#f59e0b] text-[#2a1700] border-[#ffddb8] shadow-sm'
+                  : 'bg-[#0b1326] text-[#94a3b8] border-[#222a3d] hover:text-[#dae2fd]'
+              }`}
+            >
+              <span>#{c.id}</span>
+              <span className="truncate max-w-[100px]">{c.tipo}</span>
+              {c.estado === 'Cerrado' && (
+                <CheckCircle2 className="w-3 h-3 text-[#10b981]" />
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Case Selector Dropdown */}
-        <div id="case-select-dropdown" className="bg-[#131b2e] p-2 rounded-xl border border-[#222a3d]">
-          <span className="font-mono text-[8px] uppercase text-[#94a3b8] block">Seleccionar Caso:</span>
-          <select
-            value={selectedCaseId}
-            onChange={(e) => setSelectedCaseId(e.target.value)}
-            className="bg-transparent text-xs font-mono font-bold text-[#dae2fd] outline-none cursor-pointer"
-          >
-            {cases.map((c) => (
-              <option key={c.id} value={c.id} className="bg-[#0c1322] text-[#dae2fd]">
-                #{c.id} · {c.tipo} ({c.estado})
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Quick PDF button in header */}
+        <button
+          onClick={() => setIsPdfModalOpen(true)}
+          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#f59e0b] border border-[#f59e0b]/40 font-mono text-[10px] font-bold uppercase transition-all shrink-0 active:scale-95 shadow-sm"
+          title="Ver Acta Oficial y Exportar en formato PDF"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Acta PDF Oficial</span>
+        </button>
       </div>
 
-      {/* Case Status Overview Card */}
-      <div className="bg-[#131b2e] border border-[#222a3d] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-        <div className="flex items-start justify-between gap-2 flex-wrap pb-3 border-b border-[#222a3d]">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-black text-[#ffb95f]">
-                #{selectedCase.id}
-              </span>
-              <span
-                className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                  isClosed
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : isPendingValidation
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+      {/* Responsive 2-column Grid for Medium and Large Screens */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 items-start">
+        {/* Left Column: Original Incident, Context & Normative Compliance */}
+        <div className="flex flex-col gap-4">
+          {/* 2. Header del caso */}
+          <div className="flex flex-col gap-1.5 bg-[#131b2e] p-3.5 rounded-2xl border border-[#222a3d] shadow-md">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] text-[#f59e0b] font-bold px-2 py-0.5 bg-[#1e293b] rounded border border-[#334155]">
+                  CASO #{targetCase.id}
+                </span>
+                <span className="text-[#94a3b8] font-mono text-xs">•</span>
+                <span className="font-sans text-xs text-[#dae2fd] font-semibold truncate">
+                  {targetCase.ubicacion}
+                </span>
+              </div>
+
+              {/* Dynamic Status Badge */}
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg shadow-sm border ${
+                  isCaseClosed || targetCase.estado === 'Cerrado'
+                    ? 'bg-[#064e3b] text-[#6ffbbe] border-[#10b981]/50'
+                    : 'bg-[#93000a] text-[#ffdad6] border-[#ef4444]/40'
                 }`}
               >
-                {selectedCase.estado}
-              </span>
-              <span className="font-mono text-xs text-[#94a3b8]">
-                {selectedCase.frente} · {selectedCase.ubicacion}
-              </span>
-            </div>
-            <h2 className="font-['Chivo'] font-black text-lg text-[#dae2fd] uppercase mt-1">
-              {selectedCase.tipo}
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleOpenPdf}
-            className="px-3.5 py-2 rounded-xl bg-[#1e293b] hover:bg-[#283548] text-[#f59e0b] border border-[#f59e0b]/30 font-['Chivo'] font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Generar Acta PDF</span>
-          </button>
-        </div>
-
-        {/* Visual Inspection (Before & After) */}
-        <div>
-          <span className="text-xs font-mono text-[#94a3b8] uppercase font-bold block mb-2">
-            Comparativo Visual de Conformidad:
-          </span>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-red-400 font-bold uppercase">
-                1. Condición Insegura Inicial (CCTV / Reporte)
-              </span>
-              <div className="aspect-video rounded-xl overflow-hidden bg-black border border-red-500/30 relative">
-                <img
-                  src={selectedCase.fotoUrl}
-                  alt="Inicial"
-                  className="w-full h-full object-cover"
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isCaseClosed || targetCase.estado === 'Cerrado'
+                      ? 'bg-[#10b981]'
+                      : 'bg-[#ef4444] animate-pulse'
+                  }`}
                 />
+                <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold">
+                  {isCaseClosed || targetCase.estado === 'Cerrado'
+                    ? 'ESTADO: RESUELTO / CONFORME'
+                    : 'ESTADO: ABIERTO (CRÍTICO)'}
+                </span>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">
-                2. Evidencia de Subsanación en Campo
+            <div className="flex items-center gap-2 mt-1 text-[#94a3b8]">
+              <span className="font-mono text-[9px] text-[#94a3b8] truncate">
+                {targetCase.detectadoPor.includes('Cámara')
+                  ? `Detectado por ${targetCase.camaraOrigen || 'Cámara 04'} hoy`
+                  : 'Reportado manualmente por inspector de campo'}
               </span>
-              <div className="aspect-video rounded-xl overflow-hidden bg-black border border-emerald-500/30 relative flex items-center justify-center">
-                <img
-                  src={
-                    selectedCase.evidenciaCorreccion?.fotoUrl ||
-                    selectedCase.fotoSolucionUrl ||
-                    solucionUrl
-                  }
-                  alt="Subsanación"
-                  className="w-full h-full object-cover"
+            </div>
+          </div>
+
+          {/* 3. Evidencia Original del Incidente (Fase 1) */}
+          <div className="flex flex-col gap-2 bg-[#131b2e] p-3.5 rounded-2xl border border-[#222a3d] shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase">
+                <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
+                Evidencia Original del Incidente
+              </span>
+              <span className="font-mono text-[9px] bg-[#93000a] text-[#ffdad6] px-2 py-0.5 rounded font-bold border border-[#ef4444]/30">
+                FASE 1 · INICIAL
+              </span>
+            </div>
+
+            {/* Thumbnail of Original Infraction */}
+            <div className="relative w-full rounded-xl overflow-hidden bg-[#060e20] border border-[#222a3d] mt-1 shadow-inner">
+              <img
+                src={targetCase.fotoUrl}
+                alt="Infracción detectada"
+                className="w-full h-44 sm:h-52 object-cover object-center"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#060e20]/90 via-transparent to-[#060e20]/40 pointer-events-none" />
+
+              {/* Infraction HUD Tag */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-[#ef4444]/90 text-white px-2 py-1 rounded-lg shadow-md font-mono text-[9px] font-bold uppercase tracking-tight">
+                <AlertTriangle className="w-3 h-3" />
+                <span>INFRACCIÓN: {targetCase.tipo.toUpperCase()}</span>
+              </div>
+
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-[#dae2fd] font-mono text-[9px]">
+                <span className="bg-[#060e20]/80 px-2 py-0.5 rounded backdrop-blur-sm text-[#94a3b8]">
+                  {targetCase.camaraOrigen || 'CAM-04 // FRENTE NORTE'}
+                </span>
+                <span className="bg-[#060e20]/80 px-2 py-0.5 rounded backdrop-blur-sm text-[#ffb4ab] font-bold">
+                  PRECISIÓN: {targetCase.confianzaIA || 98.4}%
+                </span>
+              </div>
+            </div>
+
+            {/* Reporter Metadata */}
+            <div className="grid grid-cols-2 gap-2 mt-1 pt-1 bg-[#0b1326] p-2.5 rounded-xl border border-[#1e293b]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Bot className="w-4 h-4 text-[#f59e0b] shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono text-[8px] text-[#94a3b8] uppercase">Reportado por:</span>
+                  <span className="font-sans text-[11px] text-[#dae2fd] font-semibold truncate">
+                    {targetCase.detectadoPor.includes('Cámara')
+                      ? 'CCTV Automatizado'
+                      : 'Reporte de Campo'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <UserCheck className="w-4 h-4 text-[#10b981] shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-mono text-[8px] text-[#94a3b8] uppercase">Supervisor:</span>
+                  <span className="font-sans text-[11px] text-[#dae2fd] font-semibold truncate">
+                    {targetCase.responsable.split('(')[0].trim()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. DOS TOGGLES SEPARADOS (Normas Técnicas Peruanas Requeridas) */}
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[9px] text-[#94a3b8] uppercase font-bold tracking-wider">
+              Validación Normativa Obligatoria (Perú):
+            </span>
+
+            {/* Toggle 1: Norma Técnica G.050 */}
+            <div
+              onClick={() => setConformeG050(!conformeG050)}
+              className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer shadow-md select-none ${
+                conformeG050
+                  ? 'bg-[#131b2e] border-[#10b981]/50'
+                  : 'bg-[#131b2e]/60 border-[#334155]'
+              }`}
+            >
+              <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                <FileCheck
+                  className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    conformeG050 ? 'text-[#10b981]' : 'text-[#64748b]'
+                  }`}
                 />
-                {!isClosed && !isPendingValidation && (
-                  <label className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer">
-                    <Camera className="w-8 h-8 text-emerald-400 mb-1" />
-                    <span className="font-['Chivo'] font-bold text-xs text-white uppercase">
-                      Cambiar Foto de Solución
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-sans text-xs font-bold text-[#dae2fd] leading-snug">
+                    Conforme con Norma Técnica G.050
+                  </span>
+                  <span className="font-mono text-[9px] text-[#94a3b8] mt-0.5">
+                    Seguridad durante la Construcción (RNE)
+                  </span>
+                </div>
+              </div>
+
+              {/* Pill Switch */}
+              <div
+                className={`w-11 h-6 rounded-full flex items-center p-0.5 shrink-0 transition-colors ${
+                  conformeG050 ? 'bg-[#10b981] justify-end' : 'bg-[#334155] justify-start'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#0b1326] shadow-md flex items-center justify-center text-[#10b981]">
+                  {conformeG050 && <Check className="w-3 h-3 stroke-[3]" />}
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle 2: D.S. N.º 011-2019-TR */}
+            <div
+              onClick={() => setConformeDS011(!conformeDS011)}
+              className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer shadow-md select-none ${
+                conformeDS011
+                  ? 'bg-[#131b2e] border-[#10b981]/50'
+                  : 'bg-[#131b2e]/60 border-[#334155]'
+              }`}
+            >
+              <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                <FileCheck
+                  className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    conformeDS011 ? 'text-[#10b981]' : 'text-[#64748b]'
+                  }`}
+                />
+                <div className="flex flex-col min-w-0">
+                  <span className="font-sans text-xs font-bold text-[#dae2fd] leading-snug">
+                    Conforme con D.S. N.º 011-2019-TR
+                  </span>
+                  <span className="font-mono text-[9px] text-[#94a3b8] mt-0.5">
+                    Reglamento de SST para el Sector Construcción
+                  </span>
+                </div>
+              </div>
+
+              {/* Pill Switch */}
+              <div
+                className={`w-11 h-6 rounded-full flex items-center p-0.5 shrink-0 transition-colors ${
+                  conformeDS011 ? 'bg-[#10b981] justify-end' : 'bg-[#334155] justify-start'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#0b1326] shadow-md flex items-center justify-center text-[#10b981]">
+                  {conformeDS011 && <Check className="w-3 h-3 stroke-[3]" />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Corrective Measure, Verification Photo & Resolution */}
+        <div className="flex flex-col gap-4">
+          {/* 4. Acción Correctiva & Evidencia de Cierre */}
+          <div className="flex flex-col gap-3 bg-[#131b2e] p-3.5 rounded-2xl border border-[#222a3d] shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="font-['Chivo'] font-bold text-xs text-[#dae2fd] flex items-center gap-1.5 uppercase">
+                <ShieldCheck className="w-4 h-4 text-[#10b981]" />
+                Acción Correctiva & Evidencia de Subsanación
+              </span>
+              <span className="font-mono text-[9px] bg-[#064e3b] text-[#6ffbbe] px-2 py-0.5 rounded font-bold border border-[#10b981]/30">
+                FASE 2 · CIERRE
+              </span>
+            </div>
+
+            {/* Recuadro Fotográfico Verificado / Subir Evidencia */}
+            <div className="relative w-full rounded-xl overflow-hidden bg-[#060e20] border border-[#222a3d] shadow-inner group">
+              <img
+                src={solutionPhoto}
+                alt="Evidencia correctiva"
+                className="w-full h-44 sm:h-52 object-cover object-center"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#060e20]/90 via-transparent to-transparent pointer-events-none" />
+
+              {/* Floating Verified Badge */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-[#10b981]/90 text-[#022c22] px-2.5 py-1 rounded-lg shadow-md font-mono text-[9px] font-bold uppercase tracking-wide">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#022c22]" />
+                <span>FOTO ADJUNTADA [VERIFICADA]</span>
+              </div>
+
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2 py-1 bg-[#0b1326]/80 hover:bg-[#1e293b] backdrop-blur-md text-[#dae2fd] rounded-lg border border-[#334155] font-mono text-[9px] flex items-center gap-1 active:scale-95 transition-all"
+                >
+                  <Upload className="w-2.5 h-2.5 text-[#f59e0b]" /> Cambiar Foto
+                </button>
+              </div>
+
+              <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between font-mono text-[9px] text-[#dae2fd]">
+                <span className="bg-[#0b1326]/90 px-2 py-0.5 rounded backdrop-blur-sm text-[#10b981] font-bold">
+                  EPP COMPLETO: CASCO CLASE E + BARBIQUEJO
+                </span>
+                <span className="bg-[#0b1326]/90 px-2 py-0.5 rounded backdrop-blur-sm text-[#94a3b8]">
+                  GPS: TORRE ANDINA
+                </span>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+            </div>
+
+            {/* Medidas adoptadas */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-mono text-[9px] uppercase tracking-wider text-[#94a3b8] font-bold">
+                Medida Inmediata Aplicada:
+              </label>
+              <div className="flex flex-col gap-2">
+                {CORRECTIVE_MEASURES.map((measure) => {
+                  const isSelected = selectedMeasure === measure;
+                  return (
+                    <button
+                      key={measure}
+                      type="button"
+                      onClick={() => setSelectedMeasure(measure)}
+                      className={`w-full text-left flex items-center justify-between p-2.5 rounded-xl border transition-all active:scale-[0.99] ${
+                        isSelected
+                          ? 'bg-[#1e293b] text-[#dae2fd] border-[#f59e0b] shadow-sm'
+                          : 'bg-[#0b1326] text-[#94a3b8] hover:bg-[#131b2e] border-[#1e293b]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <div
+                          className={`w-4 h-4 rounded-full flex items-center justify-center border shrink-0 ${
+                            isSelected
+                              ? 'bg-[#f59e0b] border-[#f59e0b] text-[#2a1700]'
+                              : 'border-[#64748b]'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span className="font-sans text-xs font-medium truncate">
+                          {measure}
+                        </span>
+                      </div>
+                      {isSelected && (
+                        <span className="font-mono text-[9px] bg-[#f59e0b] text-[#2a1700] px-1.5 py-0.2 rounded font-bold shrink-0">
+                          ACTIVO
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Campo de comentario de cierre con micrófono */}
+            <div className="flex flex-col gap-1.5 mt-1">
+              <div className="flex items-center justify-between">
+                <label className="font-mono text-[9px] uppercase tracking-wider text-[#94a3b8] font-bold">
+                  Dictamen y Protocolo de Cierre:
+                </label>
+                <button
+                  type="button"
+                  onClick={handleVoiceToggle}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[9px] uppercase transition-all border shadow-sm ${
+                    isListening
+                      ? 'bg-[#ef4444] text-white border-[#fca5a5] animate-pulse'
+                      : 'bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30 hover:bg-[#f59e0b]/25'
+                  }`}
+                >
+                  <Mic className="w-3 h-3" />
+                  <span>{isListening ? 'Detener Dictado' : 'Voz a Texto'}</span>
+                </button>
+              </div>
+              <div className="relative w-full">
+                <textarea
+                  rows={3}
+                  value={dictamen}
+                  onChange={(e) => setDictamen(e.target.value)}
+                  className={`w-full p-3 bg-[#0b1326] text-[#dae2fd] rounded-xl font-sans text-xs border outline-none resize-none shadow-inner leading-relaxed transition-all ${
+                    isListening ? 'border-[#ef4444] ring-1 ring-[#ef4444]/30' : 'border-[#1e293b] focus:border-[#10b981]'
+                  }`}
+                />
+                {isListening && (
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#ef4444]/20 border border-[#ef4444]/40 text-[#ef4444] font-mono text-[8px] uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] animate-ping" />
+                    <span>Escuchando...</span>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {selectedCase.evidenciaCorreccion?.nota && (
-            <div className="mt-3 bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-xl text-xs text-emerald-200">
-              <strong className="font-mono text-emerald-300">Nota del Responsable en Obra:</strong>{' '}
-              {selectedCase.evidenciaCorreccion.nota}
-            </div>
-          )}
-        </div>
-
-        {/* Action Controls for SSOMA */}
-        {isPendingValidation ? (
-          <div className="bg-[#18140b] border border-amber-500/40 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-['Chivo'] font-bold text-sm text-amber-300 uppercase flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" /> Caso Pendiente de Validación SSOMA
-              </h3>
-              <span className="text-[9px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
-                EVALUACIÓN REQUERIDA
-              </span>
-            </div>
-
-            {!isRejecting ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-[#94a3b8] mb-1">
-                    Dictamen Técnico de Cierre:
-                  </label>
-                  <input
-                    type="text"
-                    value={dictamen}
-                    onChange={(e) => setDictamen(e.target.value)}
-                    className="w-full bg-[#070d18] border border-[#222a3d] focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsRejecting(true)}
-                    className="px-4 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-['Chivo'] font-bold uppercase transition-all flex items-center gap-1.5"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Rechazar Evidencia</span>
-                  </button>
-
-                  <button
-                    id="certify-case-btn"
-                    type="button"
-                    onClick={handleApprove}
-                    className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-['Chivo'] font-black text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Aprobar y Emitir Acta Oficial</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleConfirmReject} className="space-y-3 bg-[#1e0d14] p-3 rounded-xl border border-red-500/40">
-                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-red-300 uppercase">
-                  <AlertCircle className="w-4 h-4" /> Motivo del Rechazo Técnico:
-                </div>
-                <textarea
-                  rows={2}
-                  required
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Detalla qué condición incumple o qué falta corregir en campo..."
-                  className="w-full bg-[#070d18] border border-red-500/40 focus:border-red-400 rounded-xl p-2.5 text-xs text-[#dae2fd] placeholder:text-[#64748b] outline-none"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsRejecting(false)}
-                    className="px-3 py-1.5 text-xs text-[#94a3b8]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-red-500 text-white font-['Chivo'] font-bold text-xs uppercase rounded-xl transition-all"
-                  >
-                    Confirmar Rechazo
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        ) : !isClosed ? (
-          <form onSubmit={handleDirectClose} className="space-y-3 pt-2 border-t border-[#1e293b]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1">
-                  Medida Correctiva Aplicada en Obra:
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={medidaAplicada}
-                  onChange={(e) => setMedidaAplicada(e.target.value)}
-                  className="w-full bg-[#070d18] border border-[#222a3d] focus:border-[#f59e0b] rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-[#94a3b8] font-bold mb-1">
-                  Dictamen Técnico SSOMA (Norma G.050):
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={dictamen}
-                  onChange={(e) => setDictamen(e.target.value)}
-                  className="w-full bg-[#070d18] border border-[#222a3d] focus:border-[#f59e0b] rounded-xl px-3 py-2 text-xs text-[#dae2fd] font-mono outline-none"
-                />
-              </div>
-            </div>
-
-            <button
-              id="certify-case-btn"
-              type="submit"
-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-['Chivo'] font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Certificar y Cerrar Caso Directamente</span>
-            </button>
-          </form>
-        ) : (
-          <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <div>
-                <div className="font-['Chivo'] font-bold text-xs uppercase">
-                  Caso Cerrado y Certificado por SSOMA
-                </div>
-                <div className="text-[11px] text-emerald-300/80 font-mono mt-0.5">
-                  Dictamen: &quot;{selectedCase.dictamenCierre || selectedCase.validacion?.comentarioSSOMA}&quot;
-                </div>
-              </div>
-            </div>
-
+          {/* 6. Botón de Acción Principal de Cierre & Exportar PDF */}
+          <div className="flex flex-col w-full pt-1">
             <button
               type="button"
-              onClick={handleOpenPdf}
-              className="px-4 py-2 rounded-xl bg-emerald-500 text-black font-['Chivo'] font-black text-xs uppercase tracking-wider transition-all shadow active:scale-95 flex items-center gap-1.5"
+              onClick={handleResolveAndClose}
+              disabled={isCaseClosed || targetCase.estado === 'Cerrado'}
+              className={`w-full min-h-13 py-3.5 px-4 rounded-xl font-['Chivo'] font-black text-sm tracking-wide uppercase flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98] transition-all ${
+                isCaseClosed || targetCase.estado === 'Cerrado'
+                  ? 'bg-[#1e293b] text-[#10b981] border border-[#10b981]/40'
+                  : 'bg-[#10b981] hover:bg-[#059669] text-[#022c22] shadow-[#10b981]/30'
+              }`}
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Descargar Acta PDF</span>
+              <CheckCircle2 className="w-5 h-5" />
+              <span>
+                {isCaseClosed || targetCase.estado === 'Cerrado'
+                  ? 'CASO FINALIZADO Y CERTIFICADO'
+                  : 'MARCAR COMO RESUELTO Y CERRAR CASO'}
+              </span>
             </button>
+
+            {/* Panel de Éxito Desplegable */}
+            {(isCaseClosed || targetCase.estado === 'Cerrado') && (
+              <div className="flex flex-col gap-3 mt-3 p-4 bg-[#1e293b] border border-[#10b981]/40 rounded-2xl shadow-2xl animate-in fade-in duration-300">
+                <div className="flex items-center gap-3 text-[#10b981]">
+                  <div className="w-9 h-9 rounded-xl bg-[#10b981]/20 text-[#10b981] flex items-center justify-center shrink-0 border border-[#10b981]/30">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-['Chivo'] font-bold text-xs text-[#6ffbbe] leading-tight uppercase">
+                      CASO #{targetCase.id} CERRADO EXITOSAMENTE
+                    </span>
+                    <span className="font-mono text-[9px] text-[#94a3b8] uppercase">
+                      Acta Oficial N° 2024-{targetCase.id} generada y lista para PDF
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-[#0b1326] rounded-xl border border-[#334155] flex items-center justify-between text-[#dae2fd]">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[8px] text-[#94a3b8] uppercase">
+                      FIRMA DIGITAL SEGURIDAD
+                    </span>
+                    <span className="font-mono text-[10px] font-bold text-[#dae2fd]">
+                      ING. CARLOS MENDOZA (CIP 184920)
+                    </span>
+                  </div>
+                  <span className="font-mono text-[9px] bg-[#10b981]/20 text-[#10b981] px-2 py-0.5 rounded font-bold border border-[#10b981]/30">
+                    AUDITADO OK
+                  </span>
+                </div>
+
+                {/* PDF and Dashboard Actions */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsPdfModalOpen(true)}
+                    className="w-full h-11 px-3 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-[#2a1700] font-['Chivo'] font-black text-[11px] uppercase flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
+                  >
+                    <Download className="w-4 h-4" />
+                    EXPORTAR PDF
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('dashboard')}
+                    className="w-full h-11 px-3 rounded-xl bg-[#131b2e] hover:bg-[#1a2337] text-[#dae2fd] font-mono text-[10px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#334155]"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-[#10b981]" />
+                    VER DASHBOARD
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* PDF Modal */}
+      {/* PDF Export Modal */}
       <PdfExportModal
-        caseItem={pdfCase}
-        isOpen={isPdfOpen}
-        onClose={() => {
-          setIsPdfOpen(false);
-          setPdfCase(null);
-        }}
+        isOpen={isPdfModalOpen}
+        caseItem={targetCase}
+        onClose={() => setIsPdfModalOpen(false)}
       />
     </div>
   );

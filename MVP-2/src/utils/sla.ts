@@ -5,34 +5,26 @@ export function getTargetDeadline(prioridad: PriorityLevel): number {
   const now = Date.now();
   switch (prioridad) {
     case 'Crítico':
-      return now + 30 * 60 * 1000; // 30 min referencia simulada
+      return now + 30 * 60 * 1000; // 30 min
     case 'Alto':
-      return now + 2 * 60 * 60 * 1000; // 2 horas
+      return now + 2 * 60 * 60 * 1000; // 2 hours
     case 'Medio':
-      return now + 24 * 60 * 60 * 1000; // 24 horas
+      return now + 24 * 60 * 60 * 1000; // 24 hours
     default:
       return now + 2 * 60 * 60 * 1000;
   }
 }
 
-export function isCaseVencido(
-  item: Pick<CaseItem, 'plazoObjetivo' | 'estado'>,
-  now = Date.now()
-): boolean {
+export function isCaseVencido(item: Pick<CaseItem, 'plazoObjetivo' | 'estado'>, now = Date.now()): boolean {
   if (item.estado === 'Cerrado') return false;
   return now > item.plazoObjetivo;
 }
 
-export function formatSlaCountdown(
-  plazoObjetivo: number,
-  estado: CaseStatus,
-  now = Date.now()
-) {
+export function formatSlaCountdown(plazoObjetivo: number, estado: CaseStatus, now = Date.now()) {
   if (estado === 'Cerrado') {
     return {
       isVencido: false,
-      text: 'Conforme (Cerrado)',
-      shortText: 'Cerrado',
+      text: 'Conforme',
       badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     };
   }
@@ -51,7 +43,7 @@ export function formatSlaCountdown(
       isVencido: true,
       text: `VENCIDO (+${overdueText})`,
       shortText: `VENCIDO +${overdueText}`,
-      badgeClass: 'bg-red-500/25 text-red-300 border-red-500/50 font-black',
+      badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse',
     };
   }
 
@@ -66,16 +58,16 @@ export function formatSlaCountdown(
     text: `${remainingText} restantes`,
     shortText: remainingText,
     badgeClass:
-      remainingMinutes <= 20
+      remainingMinutes <= 30
         ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
         : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   };
 }
 
 /**
- * Hook that updates every 3 seconds to re-calculate SLAs in real-time
+ * Hook that updates every 10 seconds to re-calculate SLAs in real-time
  */
-export function useLiveTimer(intervalMs = 3000) {
+export function useLiveTimer(intervalMs = 10000) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {

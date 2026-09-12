@@ -10,6 +10,7 @@ import {
   Radio,
   X,
   ShieldAlert,
+  Clock,
 } from 'lucide-react';
 import { NotificationService, NotificationPreferences } from '../services/notificationService';
 import { useCases } from '../context/CaseContext';
@@ -64,7 +65,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
       tag: `test-${Date.now()}`,
       soundType: 'alarm',
     });
-    showToast('Notificación de prueba enviada');
+    showToast('Notificación de prueba enviada al sistema');
   };
 
   const handleBackgroundTest = () => {
@@ -88,6 +89,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
   return (
     <div className="fixed inset-0 z-50 bg-[#060e20]/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-[#131b2e] border border-[#222a3d] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#dae2fd] max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-[#f59e0b]/20 flex items-center justify-center text-[#f59e0b] border border-[#f59e0b]/30">
@@ -110,6 +112,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
           </button>
         </div>
 
+        {/* Permission Status Banner */}
         <div
           className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
             permission === 'granted'
@@ -125,7 +128,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
             ) : permission === 'denied' ? (
               <AlertTriangle className="w-5 h-5 text-[#ef4444] shrink-0" />
             ) : (
-              <Radio className="w-5 h-5 text-[#f59e0b] shrink-0" />
+              <Radio className="w-5 h-5 text-[#f59e0b] shrink-0 animate-pulse" />
             )}
             <div className="flex flex-col min-w-0">
               <span className="font-['Chivo'] font-bold text-xs uppercase">
@@ -155,11 +158,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
           )}
         </div>
 
+        {/* Channels Configuration */}
         <div className="flex flex-col gap-2.5">
           <span className="font-mono text-[9px] text-[#94a3b8] uppercase font-bold tracking-wider">
             Canales de Notificación:
           </span>
 
+          {/* AI Alerts Toggle */}
           <div
             onClick={() => handleTogglePref('aiAlerts')}
             className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
@@ -188,6 +193,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
             </div>
           </div>
 
+          {/* Case Status Updates Toggle */}
           <div
             onClick={() => handleTogglePref('statusUpdates')}
             className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
@@ -203,7 +209,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
                   Actualizaciones de Estado de Casos
                 </span>
                 <span className="font-mono text-[9px] text-[#94a3b8]">
-                  Casos asignados, en corrección y validados
+                  Casos en proceso, subsanados y actas de cierre normativo
                 </span>
               </div>
             </div>
@@ -216,6 +222,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
             </div>
           </div>
 
+          {/* Sound & Vibration Toggle */}
           <div
             onClick={() => handleTogglePref('soundEnabled')}
             className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
@@ -233,7 +240,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
                   Alarma Sonora & Vibración Táctil
                 </span>
                 <span className="font-mono text-[9px] text-[#94a3b8]">
-                  Alerta acústica industrial optimizada para obras
+                  Alerta acústica industrial optimizada para ambientes con ruido
                 </span>
               </div>
             </div>
@@ -247,6 +254,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
           </div>
         </div>
 
+        {/* Test Controls Section */}
         <div className="flex flex-col gap-2 pt-1 border-t border-[#222a3d]">
           <span className="font-mono text-[9px] text-[#94a3b8] uppercase font-bold tracking-wider">
             Comprobación de Entrega:
@@ -274,6 +282,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, on
               {isCountingDown ? `Disparando en ${countdown}s...` : 'Probar Fondo (5s)'}
             </button>
           </div>
+
+          <p className="font-mono text-[9px] text-[#94a3b8] leading-tight">
+            💡 Consejo: Haz clic en &quot;Probar Fondo&quot; y minimiza tu navegador o cambia de pestaña. La notificación se entregará directamente en la pantalla de tu sistema operativo a través del Service Worker.
+          </p>
         </div>
 
         <button

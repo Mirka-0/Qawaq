@@ -10,9 +10,7 @@ export const Toast: React.FC = () => {
   const isSuccess =
     toast.toLowerCase().includes('cerrado') ||
     toast.toLowerCase().includes('éxito') ||
-    toast.toLowerCase().includes('resuelto') ||
-    toast.toLowerCase().includes('aprobado') ||
-    toast.toLowerCase().includes('asignado');
+    toast.toLowerCase().includes('resuelto');
 
   return (
     <div className="fixed top-20 left-4 right-4 z-50 max-w-md mx-auto pointer-events-none animate-in fade-in slide-in-from-top-4 duration-300">
@@ -28,7 +26,7 @@ export const Toast: React.FC = () => {
             isSuccess ? 'bg-[#10b981]/20 text-[#34d399]' : 'bg-[#ef4444]/20 text-[#f87171]'
           }`}
         >
-          {isSuccess ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          {isSuccess ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5 animate-pulse" />}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] uppercase font-bold tracking-wider opacity-80">
